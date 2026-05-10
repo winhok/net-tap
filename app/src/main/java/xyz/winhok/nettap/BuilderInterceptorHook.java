@@ -94,38 +94,22 @@ public final class BuilderInterceptorHook extends XC_MethodHook {
 
         private void record(Object request, Object response, long startedNanos, Throwable failure) {
             try {
-                Object eventRequest = requestFor(response, request);
-                CaptureEvent event = CaptureEvent.complete(
+                Object eventRequest = ReflectiveOkHttp.requestForResponse(response, request);
+                CaptureEvent event = CaptureEvent.fromOkHttpCall(
                         CaptureEvent.nextId(ID_PREFIX),
                         CaptureEvent.timestampNow(),
                         packageName,
                         HOOK_NAME,
-                        ReflectiveOkHttp.method(eventRequest),
-                        ReflectiveOkHttp.url(eventRequest),
-                        ReflectiveOkHttp.headers(eventRequest),
-                        ReflectiveOkHttp.requestBody(eventRequest),
-                        response == null ? 0L : ReflectiveOkHttp.responseCode(response),
-                        response == null ? "" : ReflectiveOkHttp.responseMessage(response),
-                        response == null ? new LinkedHashMap<String, String>() : ReflectiveOkHttp.headers(response),
-                        response == null
-                                ? CaptureBody.omitted(null, -1L, null, "response unavailable")
-                                : ReflectiveOkHttp.responseBody(response),
+                        eventRequest,
+                        response,
                         CaptureEvent.elapsedMsSince(startedNanos),
-                        failure == null ? null : String.valueOf(failure)
+                        failure
                 );
                 CaptureRecorder.record(event);
             } catch (Throwable e) {
                 NetTap.getXposedLogger().logSafe("%s capture failed: %s", HOOK_NAME, e);
             }
         }
-    }
-
-    private static Object requestFor(Object response, Object fallback) {
-        Object responseRequest = ReflectiveOkHttp.requestFromResponse(response);
-        if (responseRequest != null) {
-            return responseRequest;
-        }
-        return fallback;
     }
 
     private static Throwable throwableForProxyMethod(Method method, Throwable throwable) {

@@ -129,7 +129,7 @@ public final class ApacheHttp5Hook {
                     }
                 }
 
-                CaptureEvent event = CaptureEvent.complete(
+                CaptureEvent event = CaptureEvent.fromParsed(
                         CaptureEvent.nextId(ID_PREFIX),
                         CaptureEvent.timestampNow(),
                         packageName,

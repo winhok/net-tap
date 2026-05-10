@@ -4,11 +4,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.WeakHashMap;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -25,8 +23,10 @@ public final class HttpURLConnectionHook {
 
     private static final String HOOK_NAME = "HttpURLConnection";
     private static final String ID_PREFIX = "hurl";
-    private static final Map<Object, HookState> STATES =
-            Collections.synchronizedMap(new WeakHashMap<Object, HookState>());
+    private static final RequestLifecycle<Object, HookState> LIFECYCLE =
+            new RequestLifecycle<>(() -> {
+                throw new IllegalStateException("hurl requires explicit HookState");
+            });
 
     private HttpURLConnectionHook() {
     }
@@ -97,18 +97,11 @@ public final class HttpURLConnectionHook {
         if (conn == null) {
             return null;
         }
-        HookState state = STATES.get(conn);
-        if (state != null) {
-            return state;
+        HookState existing = LIFECYCLE.get(conn);
+        if (existing != null) {
+            return existing;
         }
-        synchronized (STATES) {
-            state = STATES.get(conn);
-            if (state == null) {
-                state = new HookState(packageName);
-                STATES.put(conn, state);
-            }
-        }
-        return state;
+        return LIFECYCLE.start(conn, () -> new HookState(packageName));
     }
 
     private static final class ConnectHook extends XC_MethodHook {
@@ -212,7 +205,7 @@ public final class HttpURLConnectionHook {
             TeeInputStream tee = new TeeInputStream(
                     original,
                     CaptureConfig.MAX_BODY_BYTES,
-                    (bytes, truncated, total) -> recordIfNotRecorded(state, param.thisObject, null));
+                    (bytes, truncated, total) -> recordIfNotRecorded(param.thisObject, null));
             state.responseTee = tee;
             param.setResult(tee);
         } catch (Throwable ignored) {
@@ -225,7 +218,7 @@ public final class HttpURLConnectionHook {
             if (param.getThrowable() != null) {
                 return;
             }
-            HookState state = STATES.get(param.thisObject);
+            HookState state = LIFECYCLE.get(param.thisObject);
             if (state == null) {
                 return;
             }
@@ -246,59 +239,49 @@ public final class HttpURLConnectionHook {
     private static final class DisconnectHook extends XC_MethodHook {
         @Override
         protected void beforeHookedMethod(MethodHookParam param) {
-            HookState state = STATES.get(param.thisObject);
-            recordIfNotRecorded(state, param.thisObject, null);
+            recordIfNotRecorded(param.thisObject, null);
         }
     }
 
-    private static void recordIfNotRecorded(HookState state, Object conn, String error) {
-        if (state == null) {
+    private static void recordIfNotRecorded(Object conn, String error) {
+        if (conn == null) {
             return;
         }
-        CaptureEvent event;
-        try {
-            synchronized (state) {
-                if (state.recorded) {
-                    return;
-                }
-                state.recorded = true;
-                CaptureBody reqBody = CaptureBody.fromBytes(
-                        state.requestTee == null ? null : state.requestTee.capturedBytes(),
-                        state.requestTee == null ? 0L : state.requestTee.totalObserved(),
-                        state.requestTee != null && state.requestTee.isTruncated(),
-                        "no request body");
-                CaptureBody resBody = CaptureBody.fromBytes(
-                        state.responseTee == null ? null : state.responseTee.capturedBytes(),
-                        state.responseTee == null ? 0L : state.responseTee.totalObserved(),
-                        state.responseTee != null && state.responseTee.isTruncated(),
-                        "no response body observed");
-                event = CaptureEvent.complete(
-                        CaptureEvent.nextId(ID_PREFIX),
-                        CaptureEvent.timestampNow(),
-                        state.packageName,
-                        HOOK_NAME,
-                        state.method,
-                        state.url,
-                        state.requestHeaders,
-                        reqBody,
-                        state.responseCode,
-                        state.responseMessage == null ? "" : state.responseMessage,
-                        state.responseHeaders,
-                        resBody,
-                        CaptureEvent.elapsedMsSince(state.startedNanos),
-                        error
-                );
-                state.requestTee = null;
-                state.responseTee = null;
-            }
+        LIFECYCLE.finishOnce(conn, state -> {
+            CaptureBody reqBody = CaptureBody.fromBytes(
+                    state.requestTee == null ? null : state.requestTee.capturedBytes(),
+                    state.requestTee == null ? 0L : state.requestTee.totalObserved(),
+                    state.requestTee != null && state.requestTee.isTruncated(),
+                    "no request body");
+            CaptureBody resBody = CaptureBody.fromBytes(
+                    state.responseTee == null ? null : state.responseTee.capturedBytes(),
+                    state.responseTee == null ? 0L : state.responseTee.totalObserved(),
+                    state.responseTee != null && state.responseTee.isTruncated(),
+                    "no response body observed");
+            CaptureEvent event = CaptureEvent.fromParsed(
+                    CaptureEvent.nextId(ID_PREFIX),
+                    CaptureEvent.timestampNow(),
+                    state.packageName,
+                    HOOK_NAME,
+                    state.method,
+                    state.url,
+                    state.requestHeaders,
+                    reqBody,
+                    state.responseCode,
+                    state.responseMessage == null ? "" : state.responseMessage,
+                    state.responseHeaders,
+                    resBody,
+                    CaptureEvent.elapsedMsSince(state.startedNanos),
+                    error
+            );
+            state.requestTee = null;
+            state.responseTee = null;
             CaptureRecorder.record(event);
             try {
                 MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_HURL);
             } catch (Throwable ignored) {
             }
-        } finally {
-            STATES.remove(conn);
-        }
+        });
     }
 
     private static LinkedHashMap<String, String> flattenHeaderMap(Object raw) {
@@ -344,7 +327,6 @@ public final class HttpURLConnectionHook {
         String responseMessage;
         TeeOutputStream requestTee;
         TeeInputStream responseTee;
-        boolean recorded;
 
         HookState(String packageName) {
             this.packageName = packageName;

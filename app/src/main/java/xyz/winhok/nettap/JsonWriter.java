@@ -10,6 +10,10 @@ public final class JsonWriter {
         return Long.toString(value);
     }
 
+    public static String number(int value) {
+        return Integer.toString(value);
+    }
+
     public static String bool(boolean value) {
         return Boolean.toString(value);
     }

@@ -1,11 +1,8 @@
 package xyz.winhok.nettap;
 
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -14,9 +11,10 @@ public final class CronetUrlRequestHook {
     private static final String HOOK_NAME = "CronetUrlRequest";
     private static final String ID_PREFIX = "cronet-url-request";
     private static final CronetInstallRegistry INSTALL_REGISTRY = new CronetInstallRegistry();
-    private static final Map<Object, HookState> STATES = Collections.synchronizedMap(
-            new WeakHashMap<Object, HookState>()
-    );
+    private static final RequestLifecycle<Object, HookState> LIFECYCLE =
+            new RequestLifecycle<>(() -> {
+                throw new IllegalStateException("cronet-url requires explicit HookState");
+            });
 
     private CronetUrlRequestHook() {
     }
@@ -68,7 +66,7 @@ public final class CronetUrlRequestHook {
         protected void afterHookedMethod(MethodHookParam param) throws Throwable {
             String url = firstString(param.args);
             HookState state = new HookState(packageName, url, System.nanoTime());
-            STATES.put(param.thisObject, state);
+            LIFECYCLE.start(param.thisObject, state);
             NetTap.getXposedLogger().log("%s created: %s", HOOK_NAME, url != null ? url : "(unknown url)");
         }
     }
@@ -214,41 +212,30 @@ public final class CronetUrlRequestHook {
     }
 
     private static void recordOnce(Object request, String hookName, String error) {
-        HookState state = state(request);
-        if (state == null) {
+        if (request == null) {
             return;
         }
-
-        CaptureEvent event;
-        try {
-            synchronized (state) {
-                if (state.recorded) {
-                    return;
-                }
-                state.recorded = true;
-                event = CaptureEvent.complete(
-                        CaptureEvent.nextId(ID_PREFIX),
-                        CaptureEvent.timestampNow(),
-                        state.packageName,
-                        hookName,
-                        state.method,
-                        state.url,
-                        new LinkedHashMap<String, String>(),
-                        buildRequestBody(state),
-                        state.responseCode,
-                        state.responseMessage,
-                        state.responseHeaders,
-                        buildResponseBody(state),
-                        CaptureEvent.elapsedMsSince(state.startedNanos),
-                        error
-                );
-                state.requestBodyAccumulator = null;
-                state.responseBodyAccumulator = null;
-            }
+        LIFECYCLE.finishOnce(request, state -> {
+            CaptureEvent event = CaptureEvent.fromParsed(
+                    CaptureEvent.nextId(ID_PREFIX),
+                    CaptureEvent.timestampNow(),
+                    state.packageName,
+                    hookName,
+                    state.method,
+                    state.url,
+                    new LinkedHashMap<String, String>(),
+                    buildRequestBody(state),
+                    state.responseCode,
+                    state.responseMessage,
+                    state.responseHeaders,
+                    buildResponseBody(state),
+                    CaptureEvent.elapsedMsSince(state.startedNanos),
+                    error
+            );
+            state.requestBodyAccumulator = null;
+            state.responseBodyAccumulator = null;
             CaptureRecorder.record(event);
-        } finally {
-            STATES.remove(request);
-        }
+        });
     }
 
     static void attachRequestBodyChunk(
@@ -312,7 +299,7 @@ public final class CronetUrlRequestHook {
         if (request == null) {
             return null;
         }
-        return STATES.get(request);
+        return LIFECYCLE.get(request);
     }
 
     private static String firstString(Object[] args) {
@@ -363,7 +350,6 @@ public final class CronetUrlRequestHook {
         private int responseCode;
         private String responseMessage;
         private LinkedHashMap<String, String> responseHeaders = new LinkedHashMap<>();
-        private boolean recorded;
         private CronetBodyAccumulator responseBodyAccumulator;
         private CronetBodyAccumulator requestBodyAccumulator;
 

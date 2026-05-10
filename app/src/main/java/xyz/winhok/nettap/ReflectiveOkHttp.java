@@ -47,6 +47,12 @@ public final class ReflectiveOkHttp {
         }
     }
 
+    /** Pull the request off {@code response}, falling back to {@code fallback} when unavailable. */
+    public static Object requestForResponse(Object response, Object fallback) {
+        Object responseRequest = requestFromResponse(response);
+        return responseRequest != null ? responseRequest : fallback;
+    }
+
     public static int responseCode(Object response) {
         try {
             return intValue(methodOrFieldValue(response, "code"), 0);

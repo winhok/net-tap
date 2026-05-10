@@ -1,14 +1,13 @@
 package xyz.winhok.nettap;
 
-import java.util.LinkedHashMap;
-
 import de.robv.android.xposed.XC_MethodHook;
 
 /* okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) hook. */
 public class RealInterceptorChainProceedHook extends XC_MethodHook {
     private static final String HOOK_NAME = "RealInterceptorChain.proceed";
     private static final String ID_PREFIX = "real-interceptor-chain";
-    private static final String STATE_EXTRA = "nettap.real_interceptor_chain_state";
+    private static final MethodScopeState<CallState> SCOPE =
+            new MethodScopeState<>("nettap.real_interceptor_chain_state", CallState::new);
 
     private final String packageName;
 
@@ -22,7 +21,7 @@ public class RealInterceptorChainProceedHook extends XC_MethodHook {
             if (param.args != null && param.args.length > 0) {
                 request = param.args[0];
             }
-            param.setObjectExtra(STATE_EXTRA, new HookState(System.nanoTime(), request));
+            SCOPE.start(new ParamScope(param)).request = request;
         } catch (Throwable e) {
             NetTap.getXposedLogger().logSafe("RealInterceptorChain.proceed before hook failed: %s", e);
         }
@@ -30,29 +29,21 @@ public class RealInterceptorChainProceedHook extends XC_MethodHook {
 
     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
         try {
-            HookState state = state(param);
+            MethodScopeState.Snapshot<CallState> snap = SCOPE.end(new ParamScope(param));
+            CallState state = snap.getState();
             Object response = param.getResult();
             Throwable throwable = param.getThrowable();
-            Object request = requestFor(response, state == null ? null : state.request);
-            long durationMs = state == null ? 0L : CaptureEvent.elapsedMsSince(state.startedNanos);
+            Object request = ReflectiveOkHttp.requestForResponse(response, state == null ? null : state.request);
 
-            CaptureEvent event = CaptureEvent.complete(
+            CaptureEvent event = CaptureEvent.fromOkHttpCall(
                     CaptureEvent.nextId(ID_PREFIX),
                     CaptureEvent.timestampNow(),
                     packageName,
                     HOOK_NAME,
-                    ReflectiveOkHttp.method(request),
-                    ReflectiveOkHttp.url(request),
-                    ReflectiveOkHttp.headers(request),
-                    ReflectiveOkHttp.requestBody(request),
-                    response == null ? 0L : ReflectiveOkHttp.responseCode(response),
-                    response == null ? "" : ReflectiveOkHttp.responseMessage(response),
-                    response == null ? new LinkedHashMap<>() : ReflectiveOkHttp.headers(response),
-                    response == null
-                            ? CaptureBody.omitted(null, -1L, null, "response unavailable")
-                            : ReflectiveOkHttp.responseBody(response),
-                    durationMs,
-                    throwable == null ? null : String.valueOf(throwable)
+                    request,
+                    response,
+                    snap.getDurationMs(),
+                    throwable
             );
             CaptureRecorder.record(event);
         } catch (Throwable e) {
@@ -60,32 +51,7 @@ public class RealInterceptorChainProceedHook extends XC_MethodHook {
         }
     }
 
-    private static HookState state(MethodHookParam param) {
-        try {
-            Object value = param.getObjectExtra(STATE_EXTRA);
-            if (value instanceof HookState) {
-                return (HookState) value;
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
-    private static Object requestFor(Object response, Object fallback) {
-        Object responseRequest = ReflectiveOkHttp.requestFromResponse(response);
-        if (responseRequest != null) {
-            return responseRequest;
-        }
-        return fallback;
-    }
-
-    private static final class HookState {
-        private final long startedNanos;
-        private final Object request;
-
-        private HookState(long startedNanos, Object request) {
-            this.startedNanos = startedNanos;
-            this.request = request;
-        }
+    private static final class CallState {
+        Object request;
     }
 }

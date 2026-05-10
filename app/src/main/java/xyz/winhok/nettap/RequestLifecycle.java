@@ -101,6 +101,34 @@ public final class RequestLifecycle<K, S> {
     }
 
     /**
+     * Like {@link #start(Object)} but uses a caller-supplied factory invoked
+     * only when no state is registered for {@code key}. Use when the state
+     * requires call-site-local data (e.g. packageName) the constructor-level
+     * factory does not have, and the caller is on a hot path where eagerly
+     * allocating an initial state per call would be wasteful.
+     */
+    public S start(K key, Supplier<S> factory) {
+        if (key == null) {
+            throw new NullPointerException("key");
+        }
+        if (factory == null) {
+            throw new NullPointerException("factory");
+        }
+        synchronized (states) {
+            S existing = states.get(key);
+            if (existing != null) {
+                return existing;
+            }
+            S fresh = factory.get();
+            if (fresh == null) {
+                throw new IllegalStateException("factory returned null");
+            }
+            states.put(key, fresh);
+            return fresh;
+        }
+    }
+
+    /**
      * @return the registered state, or {@code null} if {@code key} was never
      *         started or has already been collected/removed.
      */

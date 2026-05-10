@@ -215,7 +215,7 @@ public final class AndroidAsyncHook {
     }
 
     private static void recordRequestOnly(RequestSnapshot snap, String packageName, String error) {
-        CaptureEvent event = CaptureEvent.complete(
+        CaptureEvent event = CaptureEvent.fromParsed(
                 CaptureEvent.nextId(ID_PREFIX),
                 CaptureEvent.timestampNow(),
                 packageName,
@@ -301,7 +301,7 @@ public final class AndroidAsyncHook {
                 } catch (Throwable ignored) {
                 }
             }
-            CaptureEvent event = CaptureEvent.complete(
+            CaptureEvent event = CaptureEvent.fromParsed(
                     CaptureEvent.nextId(ID_PREFIX),
                     CaptureEvent.timestampNow(),
                     packageName,

@@ -32,7 +32,6 @@ public final class GrpcCaptureStateTest {
         assertTrue(s.responseHeaders.isEmpty());
         assertNull(s.requestBodyFirstMessage);
         assertNull(s.responseBodyFirstMessage);
-        assertFalse(s.recorded);
     }
 
     @Test

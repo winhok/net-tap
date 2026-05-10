@@ -1,11 +1,9 @@
 package xyz.winhok.nettap;
 
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.WeakHashMap;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -22,8 +20,10 @@ public final class CronetBidirectionalStreamHook {
     private static final String HOOK_NAME = "CronetBidirectionalStream";
     private static final String ID_PREFIX = "cronet-bidi";
     private static final CronetInstallRegistry INSTALL_REGISTRY = new CronetInstallRegistry();
-    private static final Map<Object, BidiState> STATES = Collections.synchronizedMap(
-            new WeakHashMap<Object, BidiState>());
+    private static final RequestLifecycle<Object, BidiState> LIFECYCLE =
+            new RequestLifecycle<>(() -> {
+                throw new IllegalStateException("cronet-bidi requires explicit BidiState");
+            });
 
     private CronetBidirectionalStreamHook() {
     }
@@ -79,7 +79,7 @@ public final class CronetBidirectionalStreamHook {
                         }
                     }
                 }
-                STATES.put(
+                LIFECYCLE.start(
                         param.thisObject,
                         new BidiState(packageName, url, System.nanoTime()));
             } catch (Throwable ignored) {
@@ -90,7 +90,7 @@ public final class CronetBidirectionalStreamHook {
     private static final class HeadersHook extends XC_MethodHook {
         @Override
         protected void beforeHookedMethod(MethodHookParam param) {
-            BidiState state = STATES.get(param.thisObject);
+            BidiState state = LIFECYCLE.get(param.thisObject);
             if (state == null || param.args == null || param.args.length < 1) {
                 return;
             }
@@ -116,7 +116,7 @@ public final class CronetBidirectionalStreamHook {
     }
 
     private static void appendChunk(XC_MethodHook.MethodHookParam param, boolean isWrite) {
-        BidiState state = STATES.get(param.thisObject);
+        BidiState state = LIFECYCLE.get(param.thisObject);
         if (state == null || param.args == null) {
             return;
         }
@@ -177,44 +177,34 @@ public final class CronetBidirectionalStreamHook {
     }
 
     private static void recordOnce(Object stream, String hookName, String error) {
-        BidiState state = STATES.get(stream);
-        if (state == null) {
+        if (stream == null) {
             return;
         }
-        CaptureEvent event;
-        try {
-            synchronized (state) {
-                if (state.recorded) {
-                    return;
-                }
-                state.recorded = true;
-                event = CaptureEvent.complete(
-                        CaptureEvent.nextId(ID_PREFIX),
-                        CaptureEvent.timestampNow(),
-                        state.packageName,
-                        hookName,
-                        null,
-                        state.url,
-                        new LinkedHashMap<String, String>(),
-                        bodyFrom(state.requestBody, "cronet bidi request body not observed"),
-                        state.responseCode,
-                        null,
-                        state.responseHeaders,
-                        bodyFrom(state.responseBody, "cronet bidi response body not observed"),
-                        CaptureEvent.elapsedMsSince(state.startedNanos),
-                        error
-                );
-                state.requestBody = null;
-                state.responseBody = null;
-            }
+        LIFECYCLE.finishOnce(stream, state -> {
+            CaptureEvent event = CaptureEvent.fromParsed(
+                    CaptureEvent.nextId(ID_PREFIX),
+                    CaptureEvent.timestampNow(),
+                    state.packageName,
+                    hookName,
+                    null,
+                    state.url,
+                    new LinkedHashMap<String, String>(),
+                    bodyFrom(state.requestBody, "cronet bidi request body not observed"),
+                    state.responseCode,
+                    null,
+                    state.responseHeaders,
+                    bodyFrom(state.responseBody, "cronet bidi response body not observed"),
+                    CaptureEvent.elapsedMsSince(state.startedNanos),
+                    error
+            );
+            state.requestBody = null;
+            state.responseBody = null;
             CaptureRecorder.record(event);
             try {
                 MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_CRONET_BIDI);
             } catch (Throwable ignored) {
             }
-        } finally {
-            STATES.remove(stream);
-        }
+        });
     }
 
     private static CaptureBody bodyFrom(CronetBodyAccumulator acc, String emptyReason) {
@@ -273,7 +263,6 @@ public final class CronetBidirectionalStreamHook {
         LinkedHashMap<String, String> responseHeaders = new LinkedHashMap<>();
         CronetBodyAccumulator requestBody;
         CronetBodyAccumulator responseBody;
-        boolean recorded;
 
         BidiState(String packageName, String url, long startedNanos) {
             this.packageName = packageName;

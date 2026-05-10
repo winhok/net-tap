@@ -61,7 +61,7 @@ public class Exchange_writeRequestHeadersHook extends XC_MethodHook {
                 request = param.args[0];
             }
 
-            CaptureEvent event = CaptureEvent.complete(
+            CaptureEvent event = CaptureEvent.fromParsed(
                     CaptureEvent.nextId(ID_PREFIX),
                     CaptureEvent.timestampNow(),
                     packageName,
@@ -70,7 +70,7 @@ public class Exchange_writeRequestHeadersHook extends XC_MethodHook {
                     ReflectiveOkHttp.url(request),
                     ReflectiveOkHttp.headers(request),
                     ReflectiveOkHttp.requestBody(request),
-                    0L,
+                    0,
                     "",
                     new LinkedHashMap<>(),
                     CaptureBody.omitted(

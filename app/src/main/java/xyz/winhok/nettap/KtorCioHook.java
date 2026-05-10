@@ -131,7 +131,7 @@ public final class KtorCioHook {
                     }
                 }
 
-                CaptureEvent event = CaptureEvent.complete(
+                CaptureEvent event = CaptureEvent.fromParsed(
                         CaptureEvent.nextId(ID_PREFIX),
                         CaptureEvent.timestampNow(),
                         packageName,

@@ -18,7 +18,7 @@ public final class CaptureEventTest {
         responseHeaders.put("Content-Type", "application/json");
         responseHeaders.put(null, "skipped");
 
-        CaptureEvent event = CaptureEvent.complete(
+        CaptureEvent event = CaptureEvent.fromParsed(
                 "1",
                 "2026-05-08T00:00:00.000Z",
                 "com.example",
@@ -38,9 +38,9 @@ public final class CaptureEventTest {
         String json = event.toJson();
 
         assertEquals(
-                "{\"id\":\"1\",\"timestamp\":\"2026-05-08T00:00:00.000Z\","
+                "{\"schemaVersion\":2,\"id\":\"1\",\"timestamp\":\"2026-05-08T00:00:00.000Z\","
                         + "\"packageName\":\"com.example\","
-                        + "\"okhttpHook\":\"RealInterceptorChain.proceed\","
+                        + "\"hook\":\"RealInterceptorChain.proceed\","
                         + "\"method\":\"POST\","
                         + "\"url\":\"https://example.com/login\","
                         + "\"requestHeaders\":{\"Content-Type\":\"application/json\","

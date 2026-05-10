@@ -4,10 +4,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import android.util.Base64;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -36,8 +33,10 @@ public final class GrpcCallInstaller {
     private static final String CLIENT_CALL_LISTENER = "io.grpc.ClientCall$Listener";
     private static final String HOOK_NAME = "GrpcClientCall";
 
-    private static final Map<Object, GrpcCaptureState> STATES =
-            Collections.synchronizedMap(new WeakHashMap<Object, GrpcCaptureState>());
+    private static final RequestLifecycle<Object, GrpcCaptureState> LIFECYCLE =
+            new RequestLifecycle<>(() -> {
+                throw new IllegalStateException("grpc requires explicit GrpcCaptureState");
+            });
 
     private GrpcCallInstaller() {
     }
@@ -103,55 +102,47 @@ public final class GrpcCallInstaller {
         if (state == null) {
             return;
         }
-        CaptureEvent event;
-        try {
-            synchronized (state.mutex) {
-                if (state.recorded) {
-                    return;
-                }
-                state.recorded = true;
-                String url = "grpc://" + (state.authority == null ? "" : state.authority)
-                        + (state.fullMethodName == null ? "" : state.fullMethodName);
-                CaptureBody reqBody = buildBody(
-                        state.requestBodyFirstMessage,
-                        state.requestBodyObserved,
-                        state.requestBodyTruncated);
-                CaptureBody resBody = buildBody(
-                        state.responseBodyFirstMessage,
-                        state.responseBodyObserved,
-                        state.responseBodyTruncated);
-                int responseCode = mapGrpcStatusToHttp(state.statusCode);
-                event = CaptureEvent.complete(
-                        state.id,
-                        CaptureEvent.timestampNow(),
-                        state.packageName,
-                        HOOK_NAME,
-                        "POST",
-                        url,
-                        new LinkedHashMap<>(state.requestHeaders),
-                        reqBody,
-                        responseCode,
-                        state.statusMessage == null ? "" : state.statusMessage,
-                        new LinkedHashMap<>(state.responseHeaders),
-                        resBody,
-                        CaptureEvent.elapsedMsSince(state.startedNanos),
-                        null
-                );
-                state.requestBodyFirstMessage = null;
-                state.responseBodyFirstMessage = null;
-            }
+        WeakReference<Object> ref = state.callRef;
+        Object call = ref == null ? null : ref.get();
+        if (call == null) {
+            return;
+        }
+        LIFECYCLE.finishOnce(call, s -> {
+            String url = "grpc://" + (s.authority == null ? "" : s.authority)
+                    + (s.fullMethodName == null ? "" : s.fullMethodName);
+            CaptureBody reqBody = buildBody(
+                    s.requestBodyFirstMessage,
+                    s.requestBodyObserved,
+                    s.requestBodyTruncated);
+            CaptureBody resBody = buildBody(
+                    s.responseBodyFirstMessage,
+                    s.responseBodyObserved,
+                    s.responseBodyTruncated);
+            int responseCode = mapGrpcStatusToHttp(s.statusCode);
+            CaptureEvent event = CaptureEvent.fromParsed(
+                    s.id,
+                    CaptureEvent.timestampNow(),
+                    s.packageName,
+                    HOOK_NAME,
+                    "POST",
+                    url,
+                    new LinkedHashMap<>(s.requestHeaders),
+                    reqBody,
+                    responseCode,
+                    s.statusMessage == null ? "" : s.statusMessage,
+                    new LinkedHashMap<>(s.responseHeaders),
+                    resBody,
+                    CaptureEvent.elapsedMsSince(s.startedNanos),
+                    null
+            );
+            s.requestBodyFirstMessage = null;
+            s.responseBodyFirstMessage = null;
             CaptureRecorder.record(event);
             try {
-                MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_GRPC);
+                MetricsReporter.incCaptured(s.packageName, MetricsReporter.LAYER_GRPC);
             } catch (Throwable ignored) {
             }
-        } finally {
-            WeakReference<Object> ref = state.callRef;
-            Object call = ref == null ? null : ref.get();
-            if (call != null) {
-                STATES.remove(call);
-            }
-        }
+        });
     }
 
     private static CaptureBody buildBody(byte[] bytes, int observed, boolean truncated) {
@@ -201,7 +192,7 @@ public final class GrpcCallInstaller {
                         param.args[0] = wrapped;
                     }
                 }
-                STATES.put(param.thisObject, state);
+                LIFECYCLE.start(param.thisObject, state);
                 state.callRef = new WeakReference<>(param.thisObject);
             } catch (Throwable e) {
                 NetTap.getXposedLogger().log("grpc start before failed: %s", e);
@@ -264,7 +255,7 @@ public final class GrpcCallInstaller {
         @Override
         protected void beforeHookedMethod(MethodHookParam param) {
             try {
-                GrpcCaptureState state = STATES.get(param.thisObject);
+                GrpcCaptureState state = LIFECYCLE.get(param.thisObject);
                 if (state == null || param.args == null || param.args.length < 1) {
                     return;
                 }

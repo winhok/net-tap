@@ -33,7 +33,6 @@ final class GrpcCaptureState {
 
     int statusCode;
     String statusMessage;
-    boolean recorded;
     WeakReference<Object> callRef;
 
     GrpcCaptureState(String packageName) {
