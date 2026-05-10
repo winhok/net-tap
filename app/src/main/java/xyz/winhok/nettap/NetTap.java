@@ -1,5 +1,8 @@
 package xyz.winhok.nettap;
 
+import java.util.Arrays;
+import java.util.List;
+
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import de.robv.android.xposed.XposedHelpers;
@@ -20,36 +23,56 @@ public class NetTap implements IXposedHookLoadPackage {
         return xposedLogger;
     }
 
+    private interface HookFn {
+        boolean install(String packageName, ClassLoader classLoader);
+    }
+
+    private static final class HookSpec {
+        final String tag;
+        final HookFn installer;
+
+        HookSpec(String tag, HookFn installer) {
+            this.tag = tag;
+            this.installer = installer;
+        }
+
+        boolean tryInstall(LoadPackageParam lp) {
+            try {
+                return installer.install(lp.packageName, lp.classLoader);
+            } catch (Throwable e) {
+                NetTap.getXposedLogger().log("%s install failed: %s", tag, e);
+                return false;
+            }
+        }
+    }
+
+    private static final List<HookSpec> STANDARD_HOOKS = Arrays.asList(
+            new HookSpec("cronet-url",    CronetUrlRequestHook::install),
+            new HookSpec("cronet-bidi",   CronetBidirectionalStreamHook::install),
+            new HookSpec("cronet-upload", CronetUploadDataProviderHook::install),
+            new HookSpec("grpc",          GrpcCallInstaller::install),
+            new HookSpec("hurl",          HttpURLConnectionHook::install),
+            new HookSpec("volley",        VolleyHook::install),
+            new HookSpec("fuel",          FuelHook::install),
+            new HookSpec("apache5",       ApacheHttp5Hook::install),
+            new HookSpec("ktor-cio",      KtorCioHook::install),
+            new HookSpec("android-async", AndroidAsyncHook::install),
+            new HookSpec("tls-keylog",    TlsKeyLogHook::install),
+            new HookSpec("cronet-keylog", CronetKeyLogHook::install)
+    );
+
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
         NetTap.getXposedLogger().log("module loaded into: %s", lpparam.packageName);
 
         DiscoveredOkHttp discovered = ShadedOkHttpDiscovery.discover(
                 lpparam.packageName, lpparam.classLoader);
 
-        boolean okhttpInstalled = installOkHttpHooks(lpparam, discovered);
+        boolean anyInstalled = installOkHttpHooks(lpparam, discovered);
+        for (HookSpec spec : STANDARD_HOOKS) {
+            anyInstalled |= spec.tryInstall(lpparam);
+        }
 
-        boolean cronetInstalled = installCronetUrlRequestHook(lpparam);
-        boolean cronetBidiInstalled = installCronetBidiHook(lpparam);
-        installCronetUploadDataProviderHook(lpparam);
-
-        boolean grpcInstalled = installGrpcHook(lpparam);
-
-        boolean hurlInstalled = installHttpURLConnectionHook(lpparam);
-
-        boolean volleyInstalled = installVolleyHook(lpparam);
-        boolean fuelInstalled = installFuelHook(lpparam);
-        boolean apache5Installed = installApacheHttp5Hook(lpparam);
-        boolean ktorCioInstalled = installKtorCioHook(lpparam);
-        boolean androidAsyncInstalled = installAndroidAsyncHook(lpparam);
-
-        boolean tlsKeyLogInstalled = installTlsKeyLogHook(lpparam);
-        boolean cronetKeyLogInstalled = installCronetKeyLogHook(lpparam);
-
-        if (!okhttpInstalled && !cronetInstalled && !cronetBidiInstalled
-                && !grpcInstalled && !hurlInstalled
-                && !volleyInstalled && !fuelInstalled && !apache5Installed
-                && !ktorCioInstalled && !androidAsyncInstalled
-                && !tlsKeyLogInstalled && !cronetKeyLogInstalled) {
+        if (!anyInstalled) {
             NetTap.getXposedLogger().log(
                     "no HTTP-family stack detected in %s — skipping", lpparam.packageName);
             return;
@@ -145,111 +168,6 @@ public class NetTap implements IXposedHookLoadPackage {
         } catch (Throwable e) {
             NetTap.getXposedLogger().log(
                     "failed to install %s.proceed hook: %s", chain.getName(), e);
-            return false;
-        }
-    }
-
-    private boolean installCronetUrlRequestHook(final LoadPackageParam lpparam) {
-        return CronetUrlRequestHook.install(lpparam.packageName, lpparam.classLoader);
-    }
-
-    private boolean installCronetBidiHook(final LoadPackageParam lpparam) {
-        try {
-            return CronetBidirectionalStreamHook.install(
-                    lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("cronet-bidi install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installCronetUploadDataProviderHook(final LoadPackageParam lpparam) {
-        try {
-            return CronetUploadDataProviderHook.install(
-                    lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("cronet-upload install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installGrpcHook(final LoadPackageParam lpparam) {
-        try {
-            return GrpcCallInstaller.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("grpc install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installHttpURLConnectionHook(final LoadPackageParam lpparam) {
-        try {
-            return HttpURLConnectionHook.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("hurl install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installVolleyHook(final LoadPackageParam lpparam) {
-        try {
-            return VolleyHook.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("volley install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installFuelHook(final LoadPackageParam lpparam) {
-        try {
-            return FuelHook.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("fuel install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installApacheHttp5Hook(final LoadPackageParam lpparam) {
-        try {
-            return ApacheHttp5Hook.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("apache5 install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installKtorCioHook(final LoadPackageParam lpparam) {
-        try {
-            return KtorCioHook.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("ktor-cio install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installAndroidAsyncHook(final LoadPackageParam lpparam) {
-        try {
-            return AndroidAsyncHook.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("android-async install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installTlsKeyLogHook(final LoadPackageParam lpparam) {
-        try {
-            return TlsKeyLogHook.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("tls-keylog install failed: %s", e);
-            return false;
-        }
-    }
-
-    private boolean installCronetKeyLogHook(final LoadPackageParam lpparam) {
-        try {
-            return CronetKeyLogHook.install(lpparam.packageName, lpparam.classLoader);
-        } catch (Throwable e) {
-            NetTap.getXposedLogger().log("cronet-keylog install failed: %s", e);
             return false;
         }
     }
