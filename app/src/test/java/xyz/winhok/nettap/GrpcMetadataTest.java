@@ -49,7 +49,7 @@ public final class GrpcMetadataTest {
     }
 
     @Test
-    public void extractHeadersRedactsAuthorization() {
+    public void extractHeadersKeepsSensitiveValuesRaw() {
         FakeMetadata md = new FakeMetadata(new Object[]{
                 "authorization", "Bearer secret-token",
                 "cookie", "session=abc",
@@ -57,9 +57,9 @@ public final class GrpcMetadataTest {
                 "x-trace", "visible"
         });
         Map<String, String> result = GrpcMetadata.extractHeaders(md);
-        assertEquals("<redacted>", result.get("authorization"));
-        assertEquals("<redacted>", result.get("cookie"));
-        assertEquals("<redacted>", result.get("x-api-key"));
+        assertEquals("Bearer secret-token", result.get("authorization"));
+        assertEquals("session=abc", result.get("cookie"));
+        assertEquals("xyz", result.get("x-api-key"));
         assertEquals("visible", result.get("x-trace"));
     }
 

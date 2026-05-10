@@ -2,20 +2,19 @@ package xyz.winhok.nettap;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 
 /**
  * Extracts header entries from an {@code io.grpc.Metadata} instance without
  * linking against the grpc API. Uses reflection against the
- * {@code namesAndValues} field layout shared by grpc-core 1.x. Redacts
- * authorization-style values so captured logs don't leak credentials.
+ * {@code namesAndValues} field layout shared by grpc-core 1.x.
+ *
+ * <p>Net-Tap 仅作为内部调试 / 学习抓包工具使用，JSONL 与 logcat 需要保留
+ * authorization、cookie、x-api-key 等原始请求头的真实值以便分析请求，
+ * 因此本类不做任何脱敏处理（与 OkHttp / Cronet / HttpURLConnection 三条
+ * 路径保持一致）。请勿在生产环境或对外分发的场景中启用。
  */
 final class GrpcMetadata {
-
-    private static final String[] SENSITIVE = {
-            "authorization", "auth-token", "x-api-key", "cookie", "set-cookie"
-    };
 
     private GrpcMetadata() {
     }
@@ -48,9 +47,6 @@ final class GrpcMetadata {
                 }
                 if (value == null) {
                     value = "";
-                }
-                if (isSensitive(name)) {
-                    value = "<redacted>";
                 }
                 result.put(name, value);
             }
@@ -98,10 +94,5 @@ final class GrpcMetadata {
             return ((String) o).getBytes(StandardCharsets.UTF_8);
         }
         return null;
-    }
-
-    private static boolean isSensitive(String name) {
-        String lower = name.toLowerCase();
-        return Arrays.asList(SENSITIVE).contains(lower);
     }
 }
