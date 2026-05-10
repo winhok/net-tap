@@ -61,11 +61,7 @@ public final class MetricsReporter {
     }
 
     private static void inc(String k) {
-        AtomicLong c = COUNTERS.get(k);
-        if (c == null) {
-            c = COUNTERS.computeIfAbsent(k, key -> new AtomicLong());
-        }
-        c.incrementAndGet();
+        COUNTERS.computeIfAbsent(k, key -> new AtomicLong()).incrementAndGet();
     }
 
     private static String key(String packageName, String layer, String kind) {

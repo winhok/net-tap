@@ -130,7 +130,6 @@ final class GrpcListenerProxy {
                             code = ((Number) v).intValue();
                         }
                     } catch (Throwable ignored) {
-                        code = codeObj.toString().hashCode();
                     }
                 }
                 String description = null;

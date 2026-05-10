@@ -1,6 +1,8 @@
 package xyz.winhok.nettap;
 
 public final class JsonWriter {
+    private static final char[] HEX = "0123456789abcdef".toCharArray();
+
     private JsonWriter() {
     }
 
@@ -63,7 +65,9 @@ public final class JsonWriter {
                     break;
                 default:
                     if (character < 0x20) {
-                        result.append(String.format("\\u%04x", (int) character));
+                        result.append("\\u00")
+                                .append(HEX[(character >> 4) & 0xF])
+                                .append(HEX[character & 0xF]);
                     } else {
                         result.append(character);
                     }

@@ -57,8 +57,6 @@ public final class CronetBidirectionalStreamHook {
                     addAll(installedHooks, XposedBridge.hookAllConstructors(
                             cls, new CtorHook(packageName)));
                     addAll(installedHooks, XposedBridge.hookAllMethods(
-                            cls, "onStreamReady", new ReadyHook()));
-                    addAll(installedHooks, XposedBridge.hookAllMethods(
                             cls, "onResponseHeadersReceived", new HeadersHook()));
                     addAll(installedHooks, XposedBridge.hookAllMethods(
                             cls, "onReadCompleted", new ReadHook()));
@@ -126,9 +124,6 @@ public final class CronetBidirectionalStreamHook {
             } catch (Throwable ignored) {
             }
         }
-    }
-
-    private static final class ReadyHook extends XC_MethodHook {
     }
 
     private static final class HeadersHook extends XC_MethodHook {

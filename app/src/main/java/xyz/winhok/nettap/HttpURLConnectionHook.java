@@ -181,7 +181,7 @@ public final class HttpURLConnectionHook {
 
         @Override
         protected void afterHookedMethod(MethodHookParam param) {
-            wrapInputStream(param, packageName, false);
+            wrapInputStream(param, packageName);
         }
     }
 
@@ -194,14 +194,13 @@ public final class HttpURLConnectionHook {
 
         @Override
         protected void afterHookedMethod(MethodHookParam param) {
-            wrapInputStream(param, packageName, true);
+            wrapInputStream(param, packageName);
         }
     }
 
     private static void wrapInputStream(
             XC_MethodHook.MethodHookParam param,
-            String packageName,
-            boolean isError
+            String packageName
     ) {
         if (param.getThrowable() != null || !(param.getResult() instanceof InputStream)) {
             return;
@@ -220,7 +219,6 @@ public final class HttpURLConnectionHook {
                     CaptureConfig.MAX_BODY_BYTES,
                     (bytes, truncated, total) -> recordIfNotRecorded(state, param.thisObject, null));
             state.responseTee = tee;
-            state.errorStream = isError;
             param.setResult(tee);
         } catch (Throwable ignored) {
         }
@@ -363,7 +361,6 @@ public final class HttpURLConnectionHook {
         String responseMessage;
         TeeOutputStream requestTee;
         TeeInputStream responseTee;
-        boolean errorStream;
         boolean recorded;
 
         HookState(String packageName) {

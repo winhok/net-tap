@@ -12,7 +12,7 @@ import java.util.zip.GZIPInputStream;
 // FIXME(follow-up): consolidate returnTypesEquivalent with Reflect.typesEquivalent in a future cleanup step.
 public final class ReflectiveOkHttp {
     private static final String REQUEST_BODY_UNAVAILABLE = "request body unavailable";
-    private static final String RESPONSE_BODY_UNAVAILABLE = "peekBody unavailable";
+    private static final String RESPONSE_BODY_UNAVAILABLE = "response body unavailable";
 
     private ReflectiveOkHttp() {
     }
@@ -444,53 +444,6 @@ public final class ReflectiveOkHttp {
         } catch (Throwable ignored) {
             return -1L;
         }
-    }
-
-    private static String truncateUtf8Bytes(String text, int maxBytes) {
-        if (text == null) {
-            return null;
-        }
-
-        if (utf8Length(text) <= maxBytes) {
-            return text;
-        }
-
-        int offset = 0;
-        int bytes = 0;
-        while (offset < text.length()) {
-            int codePoint = text.codePointAt(offset);
-            int charCount = Character.charCount(codePoint);
-            int codePointBytes = utf8Length(codePoint, text.charAt(offset));
-            if (bytes + codePointBytes > maxBytes) {
-                break;
-            }
-            bytes += codePointBytes;
-            offset += charCount;
-        }
-        return text.substring(0, offset);
-    }
-
-    private static long utf8Length(String text) {
-        if (text == null) {
-            return 0L;
-        }
-        return text.getBytes(StandardCharsets.UTF_8).length;
-    }
-
-    private static int utf8Length(int codePoint, char firstChar) {
-        if (Character.isSurrogate(firstChar) && Character.charCount(codePoint) == 1) {
-            return 1;
-        }
-        if (codePoint <= 0x7F) {
-            return 1;
-        }
-        if (codePoint <= 0x7FF) {
-            return 2;
-        }
-        if (codePoint <= 0xFFFF) {
-            return 3;
-        }
-        return 4;
     }
 
     private static Object safeMethodOrFieldValue(Object target, String name) {
