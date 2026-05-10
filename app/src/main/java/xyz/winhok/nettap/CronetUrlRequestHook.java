@@ -67,6 +67,8 @@ public final class CronetUrlRequestHook {
                             cronetUrlRequest, "onCanceled", new CanceledHook()));
                     addUnhooks(installedHooks, XposedBridge.hookAllMethods(
                             cronetUrlRequest, "onReadCompleted", new ReadCompletedHook()));
+                    addUnhooks(installedHooks, XposedBridge.hookAllMethods(
+                            cronetUrlRequest, "setHttpMethod", new SetHttpMethodHook()));
                     INSTALL_REGISTRY.markInstalled(classLoader, className);
                     NetTap.getXposedLogger().log("installed hook: %s", className);
                     hooked++;
@@ -247,6 +249,22 @@ public final class CronetUrlRequestHook {
         }
     }
 
+    private static final class SetHttpMethodHook extends XC_MethodHook {
+        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+            HookState state = state(param.thisObject);
+            if (state == null) {
+                return;
+            }
+            String method = stringArg(param.args, 0);
+            if (method == null) {
+                return;
+            }
+            synchronized (state) {
+                state.method = method;
+            }
+        }
+    }
+
     private static void recordOnce(Object request, String hookName, String error) {
         HookState state = state(request);
         if (state == null) {
@@ -264,7 +282,7 @@ public final class CronetUrlRequestHook {
                     timestamp(),
                     state.packageName,
                     hookName,
-                    null,
+                    state.method,
                     state.url,
                     new LinkedHashMap<String, String>(),
                     buildRequestBody(state),
@@ -437,6 +455,7 @@ public final class CronetUrlRequestHook {
         private final String packageName;
         private final long startedNanos;
         private String url;
+        private String method = "GET";
         private int responseCode;
         private String responseMessage;
         private LinkedHashMap<String, String> responseHeaders = new LinkedHashMap<>();
