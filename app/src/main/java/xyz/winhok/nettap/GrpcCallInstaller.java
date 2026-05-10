@@ -3,7 +3,7 @@ package xyz.winhok.nettap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
-import java.util.Base64;
+import android.util.Base64;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -154,7 +154,7 @@ public final class GrpcCallInstaller {
                     "application/grpc", observed, null,
                     "grpc message not captured");
         }
-        String b64 = Base64.getEncoder().encodeToString(bytes);
+        String b64 = Base64.encodeToString(bytes, Base64.NO_WRAP);
         String text = "[grpc-proto base64:" + b64 + "]";
         return CaptureBody.text(
                 "application/grpc", observed, null, truncated, text);
