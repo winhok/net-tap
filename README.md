@@ -14,15 +14,21 @@ It also tracks per-layer install and capture counts via `MetricsReporter` so you
 ## What it captures per request
 
 * Method, URL, duration
-* Request + response headers (sensitive values like `authorization`, `cookie`, `x-api-key` are `<redacted>` where applicable)
+* Request + response headers captured verbatim, **including `authorization` / `cookie` / `x-api-key`** — no redaction is performed. The capture file sits under the host app's private data dir; anyone with root can read it, so treat it as sensitive material.
 * Request + response body up to `CaptureConfig.MAX_BODY_BYTES`, truncation flagged explicitly
 * Response status code + message
 * gRPC method name (`/package.Service/Method`), authority, status code, description
 
 ## Output
 
-* JSON Lines at `/data/data/<pkg>/files/_okhttp_capture.jsonl` — one file per hooked app
-* Chunked `CAPTURE_JSON` messages in logcat with the `NetTap` tag
+* JSON Lines at `/data/data/<pkg>/files/_okhttp_capture.jsonl` — one file per hooked app. Authoritative capture source (logcat drops chunks on large payloads, this file does not). When a record is written, bodies are captured up to `CaptureConfig.MAX_BODY_BYTES`; oversized or unsupported bodies (one-shot, duplex, opaque binary, unknown content type) are marked truncated or omitted with an explicit reason. Under sustained file-writer backpressure the oldest pending records may be dropped — watch for `filelogger backpressure: N lines dropped so far` in logcat.
+* Chunked `CAPTURE_JSON` messages in logcat with the `NetTap` tag. Best-effort only — Android's per-uid logcat rate limiter silently drops chunks on large payloads, so don't try to reconstruct complete bodies from logcat. Records over `LOGCAT_MAX_JSON_CHARS` are skipped on this channel entirely; the JSONL file still receives them.
+
+To tail the capture file live (LSPosed implies root):
+
+```bash
+adb shell 'su -c "tail -F /data/data/<pkg>/files/_okhttp_capture.jsonl"' | jq .
+```
 
 ## Hook installation order
 

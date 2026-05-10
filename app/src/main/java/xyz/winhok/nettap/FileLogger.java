@@ -33,8 +33,12 @@ public class FileLogger {
     private static final byte[] NEWLINE = {'\n'};
     private final String filename;
     private final boolean rawOnly;
+    /** Serializes {@link #bufferedOut} lifecycle (init/close) <em>and</em> every
+     *  write against it, so the writer thread never writes through a stream the
+     *  close path is concurrently nulling. */
     private final Object initLock = new Object();
     private final AtomicBoolean shutdownHookRegistered = new AtomicBoolean(false);
+    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
     private final AtomicLong droppedLines = new AtomicLong();
 
     private volatile BufferedOutputStream bufferedOut;
@@ -108,28 +112,36 @@ public class FileLogger {
             if (item == POISON) {
                 break;
             }
-            BufferedOutputStream out = this.bufferedOut;
-            if (out == null) {
-                continue;
-            }
-            try {
-                out.write(item);
-                out.write(NEWLINE);
-                // Flush only when the queue is empty so bursty traffic
-                // amortizes through the 64KB buffer.
-                if (queue.isEmpty()) {
-                    out.flush();
+            synchronized (initLock) {
+                BufferedOutputStream out = this.bufferedOut;
+                if (out == null) {
+                    continue;
                 }
-            } catch (Throwable e) {
-                NetTap.getXposedLogger().logSafe("filelogger writer failed: %s", e);
+                try {
+                    out.write(item);
+                    out.write(NEWLINE);
+                    // Flush only when the queue is empty so bursty traffic
+                    // amortizes through the 64KB buffer.
+                    if (queue.isEmpty()) {
+                        out.flush();
+                    }
+                } catch (Throwable e) {
+                    NetTap.getXposedLogger().logSafe("filelogger writer failed: %s", e);
+                }
             }
         }
     }
-    /** Flush and close. Safe to call multiple times; signals the writer to drain and exit. */
+    /** Flush and close. Terminal — once called, further {@link #logRawLine} calls
+     *  are dropped and the writer thread does not restart. Safe to call multiple times. */
     public void closeQuietly() {
-        if (writerThread != null) {
-            queue.offer(POISON);
-            Thread t = writerThread;
+        shuttingDown.set(true);
+        Thread t = writerThread;
+        if (t != null) {
+            // Queue may be full; drop-then-offer in a loop until POISON lands.
+            // shuttingDown gates new producers so this terminates quickly.
+            while (!queue.offer(POISON)) {
+                queue.poll();
+            }
             try {
                 t.join(500L);
             } catch (InterruptedException ie) {
@@ -185,7 +197,7 @@ public class FileLogger {
     /** Append a raw line. Hot path — never blocks on disk I/O.
      *  Overflow drops the oldest pending line (latest-wins). */
     public void logRawLine(String line) {
-        if (line == null) {
+        if (line == null || shuttingDown.get()) {
             return;
         }
         initialize();
