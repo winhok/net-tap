@@ -1,5 +1,6 @@
 package xyz.winhok.nettap;
 
+import java.lang.ref.WeakReference;
 import java.util.LinkedHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -35,6 +36,7 @@ final class GrpcCaptureState {
     int statusCode;
     String statusMessage;
     boolean recorded;
+    WeakReference<Object> callRef;
 
     GrpcCaptureState(String packageName) {
         this.packageName = packageName;

@@ -272,30 +272,35 @@ public final class CronetUrlRequestHook {
         }
 
         CaptureEvent event;
-        synchronized (state) {
-            if (state.recorded) {
-                return;
+        try {
+            synchronized (state) {
+                if (state.recorded) {
+                    return;
+                }
+                state.recorded = true;
+                event = CaptureEvent.complete(
+                        nextId(),
+                        timestamp(),
+                        state.packageName,
+                        hookName,
+                        state.method,
+                        state.url,
+                        new LinkedHashMap<String, String>(),
+                        buildRequestBody(state),
+                        state.responseCode,
+                        state.responseMessage,
+                        state.responseHeaders,
+                        buildResponseBody(state),
+                        durationMs(state.startedNanos),
+                        error
+                );
+                state.requestBodyAccumulator = null;
+                state.responseBodyAccumulator = null;
             }
-            state.recorded = true;
-            event = CaptureEvent.complete(
-                    nextId(),
-                    timestamp(),
-                    state.packageName,
-                    hookName,
-                    state.method,
-                    state.url,
-                    new LinkedHashMap<String, String>(),
-                    buildRequestBody(state),
-                    state.responseCode,
-                    state.responseMessage,
-                    state.responseHeaders,
-                    buildResponseBody(state),
-                    durationMs(state.startedNanos),
-                    error
-            );
+            CaptureRecorder.record(event);
+        } finally {
+            STATES.remove(request);
         }
-
-        CaptureRecorder.record(event);
     }
 
     /**

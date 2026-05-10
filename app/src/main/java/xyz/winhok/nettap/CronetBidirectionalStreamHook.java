@@ -221,32 +221,38 @@ public final class CronetBidirectionalStreamHook {
             return;
         }
         CaptureEvent event;
-        synchronized (state) {
-            if (state.recorded) {
-                return;
-            }
-            state.recorded = true;
-            event = CaptureEvent.complete(
-                    "cronet-bidi-" + NEXT_ID.incrementAndGet(),
-                    timestamp(),
-                    state.packageName,
-                    hookName,
-                    null,
-                    state.url,
-                    new LinkedHashMap<String, String>(),
-                    bodyFrom(state.requestBody, "cronet bidi request body not observed"),
-                    state.responseCode,
-                    null,
-                    state.responseHeaders,
-                    bodyFrom(state.responseBody, "cronet bidi response body not observed"),
-                    Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L),
-                    error
-            );
-        }
-        CaptureRecorder.record(event);
         try {
-            MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_CRONET_BIDI);
-        } catch (Throwable ignored) {
+            synchronized (state) {
+                if (state.recorded) {
+                    return;
+                }
+                state.recorded = true;
+                event = CaptureEvent.complete(
+                        "cronet-bidi-" + NEXT_ID.incrementAndGet(),
+                        timestamp(),
+                        state.packageName,
+                        hookName,
+                        null,
+                        state.url,
+                        new LinkedHashMap<String, String>(),
+                        bodyFrom(state.requestBody, "cronet bidi request body not observed"),
+                        state.responseCode,
+                        null,
+                        state.responseHeaders,
+                        bodyFrom(state.responseBody, "cronet bidi response body not observed"),
+                        Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L),
+                        error
+                );
+                state.requestBody = null;
+                state.responseBody = null;
+            }
+            CaptureRecorder.record(event);
+            try {
+                MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_CRONET_BIDI);
+            } catch (Throwable ignored) {
+            }
+        } finally {
+            STATES.remove(stream);
         }
     }
 

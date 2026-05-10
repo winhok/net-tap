@@ -1,5 +1,6 @@
 package xyz.winhok.nettap;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
@@ -107,44 +108,54 @@ public final class GrpcCallInstaller {
             return;
         }
         CaptureEvent event;
-        synchronized (state.mutex) {
-            if (state.recorded) {
-                return;
-            }
-            state.recorded = true;
-            String url = "grpc://" + (state.authority == null ? "" : state.authority)
-                    + (state.fullMethodName == null ? "" : state.fullMethodName);
-            CaptureBody reqBody = buildBody(
-                    state.requestBodyFirstMessage,
-                    state.requestBodyObserved,
-                    state.requestBodyTruncated);
-            CaptureBody resBody = buildBody(
-                    state.responseBodyFirstMessage,
-                    state.responseBodyObserved,
-                    state.responseBodyTruncated);
-            long durationMs = Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L);
-            int responseCode = mapGrpcStatusToHttp(state.statusCode);
-            event = CaptureEvent.complete(
-                    state.id,
-                    timestamp(),
-                    state.packageName,
-                    HOOK_NAME,
-                    "POST",
-                    url,
-                    new LinkedHashMap<>(state.requestHeaders),
-                    reqBody,
-                    responseCode,
-                    state.statusMessage == null ? "" : state.statusMessage,
-                    new LinkedHashMap<>(state.responseHeaders),
-                    resBody,
-                    durationMs,
-                    null
-            );
-        }
-        CaptureRecorder.record(event);
         try {
-            MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_GRPC);
-        } catch (Throwable ignored) {
+            synchronized (state.mutex) {
+                if (state.recorded) {
+                    return;
+                }
+                state.recorded = true;
+                String url = "grpc://" + (state.authority == null ? "" : state.authority)
+                        + (state.fullMethodName == null ? "" : state.fullMethodName);
+                CaptureBody reqBody = buildBody(
+                        state.requestBodyFirstMessage,
+                        state.requestBodyObserved,
+                        state.requestBodyTruncated);
+                CaptureBody resBody = buildBody(
+                        state.responseBodyFirstMessage,
+                        state.responseBodyObserved,
+                        state.responseBodyTruncated);
+                long durationMs = Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L);
+                int responseCode = mapGrpcStatusToHttp(state.statusCode);
+                event = CaptureEvent.complete(
+                        state.id,
+                        timestamp(),
+                        state.packageName,
+                        HOOK_NAME,
+                        "POST",
+                        url,
+                        new LinkedHashMap<>(state.requestHeaders),
+                        reqBody,
+                        responseCode,
+                        state.statusMessage == null ? "" : state.statusMessage,
+                        new LinkedHashMap<>(state.responseHeaders),
+                        resBody,
+                        durationMs,
+                        null
+                );
+                state.requestBodyFirstMessage = null;
+                state.responseBodyFirstMessage = null;
+            }
+            CaptureRecorder.record(event);
+            try {
+                MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_GRPC);
+            } catch (Throwable ignored) {
+            }
+        } finally {
+            WeakReference<Object> ref = state.callRef;
+            Object call = ref == null ? null : ref.get();
+            if (call != null) {
+                STATES.remove(call);
+            }
         }
     }
 
@@ -202,6 +213,7 @@ public final class GrpcCallInstaller {
                     }
                 }
                 STATES.put(param.thisObject, state);
+                state.callRef = new WeakReference<>(param.thisObject);
             } catch (Throwable e) {
                 NetTap.getXposedLogger().log("grpc start before failed: %s", e);
             }

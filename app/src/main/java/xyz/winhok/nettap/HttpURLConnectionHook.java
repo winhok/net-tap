@@ -261,42 +261,48 @@ public final class HttpURLConnectionHook {
             return;
         }
         CaptureEvent event;
-        synchronized (state) {
-            if (state.recorded) {
-                return;
-            }
-            state.recorded = true;
-            CaptureBody reqBody = buildBody(
-                    state.requestTee == null ? null : state.requestTee.capturedBytes(),
-                    state.requestTee != null && state.requestTee.isTruncated(),
-                    state.requestTee == null ? 0L : state.requestTee.totalObserved(),
-                    "no request body");
-            CaptureBody resBody = buildBody(
-                    state.responseTee == null ? null : state.responseTee.capturedBytes(),
-                    state.responseTee != null && state.responseTee.isTruncated(),
-                    state.responseTee == null ? 0L : state.responseTee.totalObserved(),
-                    "no response body observed");
-            event = CaptureEvent.complete(
-                    "hurl-" + NEXT_ID.incrementAndGet(),
-                    timestamp(),
-                    state.packageName,
-                    HOOK_NAME,
-                    state.method,
-                    state.url,
-                    state.requestHeaders,
-                    reqBody,
-                    state.responseCode,
-                    state.responseMessage == null ? "" : state.responseMessage,
-                    state.responseHeaders,
-                    resBody,
-                    Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L),
-                    error
-            );
-        }
-        CaptureRecorder.record(event);
         try {
-            MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_HURL);
-        } catch (Throwable ignored) {
+            synchronized (state) {
+                if (state.recorded) {
+                    return;
+                }
+                state.recorded = true;
+                CaptureBody reqBody = buildBody(
+                        state.requestTee == null ? null : state.requestTee.capturedBytes(),
+                        state.requestTee != null && state.requestTee.isTruncated(),
+                        state.requestTee == null ? 0L : state.requestTee.totalObserved(),
+                        "no request body");
+                CaptureBody resBody = buildBody(
+                        state.responseTee == null ? null : state.responseTee.capturedBytes(),
+                        state.responseTee != null && state.responseTee.isTruncated(),
+                        state.responseTee == null ? 0L : state.responseTee.totalObserved(),
+                        "no response body observed");
+                event = CaptureEvent.complete(
+                        "hurl-" + NEXT_ID.incrementAndGet(),
+                        timestamp(),
+                        state.packageName,
+                        HOOK_NAME,
+                        state.method,
+                        state.url,
+                        state.requestHeaders,
+                        reqBody,
+                        state.responseCode,
+                        state.responseMessage == null ? "" : state.responseMessage,
+                        state.responseHeaders,
+                        resBody,
+                        Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L),
+                        error
+                );
+                state.requestTee = null;
+                state.responseTee = null;
+            }
+            CaptureRecorder.record(event);
+            try {
+                MetricsReporter.incCaptured(state.packageName, MetricsReporter.LAYER_HURL);
+            } catch (Throwable ignored) {
+            }
+        } finally {
+            STATES.remove(conn);
         }
     }
 
