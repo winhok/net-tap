@@ -36,8 +36,20 @@ public class NetTap implements IXposedHookLoadPackage {
 
         boolean hurlInstalled = installHttpURLConnectionHook(lpparam);
 
+        boolean volleyInstalled = installVolleyHook(lpparam);
+        boolean fuelInstalled = installFuelHook(lpparam);
+        boolean apache5Installed = installApacheHttp5Hook(lpparam);
+        boolean ktorCioInstalled = installKtorCioHook(lpparam);
+        boolean androidAsyncInstalled = installAndroidAsyncHook(lpparam);
+
+        boolean tlsKeyLogInstalled = installTlsKeyLogHook(lpparam);
+        boolean cronetKeyLogInstalled = installCronetKeyLogHook(lpparam);
+
         if (!okhttpInstalled && !cronetInstalled && !cronetBidiInstalled
-                && !grpcInstalled && !hurlInstalled) {
+                && !grpcInstalled && !hurlInstalled
+                && !volleyInstalled && !fuelInstalled && !apache5Installed
+                && !ktorCioInstalled && !androidAsyncInstalled
+                && !tlsKeyLogInstalled && !cronetKeyLogInstalled) {
             NetTap.getXposedLogger().log(
                     "no HTTP-family stack detected in %s — skipping", lpparam.packageName);
             return;
@@ -175,6 +187,69 @@ public class NetTap implements IXposedHookLoadPackage {
             return HttpURLConnectionHook.install(lpparam.packageName, lpparam.classLoader);
         } catch (Throwable e) {
             NetTap.getXposedLogger().log("hurl install failed: %s", e);
+            return false;
+        }
+    }
+
+    private boolean installVolleyHook(final LoadPackageParam lpparam) {
+        try {
+            return VolleyHook.install(lpparam.packageName, lpparam.classLoader);
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().log("volley install failed: %s", e);
+            return false;
+        }
+    }
+
+    private boolean installFuelHook(final LoadPackageParam lpparam) {
+        try {
+            return FuelHook.install(lpparam.packageName, lpparam.classLoader);
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().log("fuel install failed: %s", e);
+            return false;
+        }
+    }
+
+    private boolean installApacheHttp5Hook(final LoadPackageParam lpparam) {
+        try {
+            return ApacheHttp5Hook.install(lpparam.packageName, lpparam.classLoader);
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().log("apache5 install failed: %s", e);
+            return false;
+        }
+    }
+
+    private boolean installKtorCioHook(final LoadPackageParam lpparam) {
+        try {
+            return KtorCioHook.install(lpparam.packageName, lpparam.classLoader);
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().log("ktor-cio install failed: %s", e);
+            return false;
+        }
+    }
+
+    private boolean installAndroidAsyncHook(final LoadPackageParam lpparam) {
+        try {
+            return AndroidAsyncHook.install(lpparam.packageName, lpparam.classLoader);
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().log("android-async install failed: %s", e);
+            return false;
+        }
+    }
+
+    private boolean installTlsKeyLogHook(final LoadPackageParam lpparam) {
+        try {
+            return TlsKeyLogHook.install(lpparam.packageName, lpparam.classLoader);
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().log("tls-keylog install failed: %s", e);
+            return false;
+        }
+    }
+
+    private boolean installCronetKeyLogHook(final LoadPackageParam lpparam) {
+        try {
+            return CronetKeyLogHook.install(lpparam.packageName, lpparam.classLoader);
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().log("cronet-keylog install failed: %s", e);
             return false;
         }
     }

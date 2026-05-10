@@ -46,6 +46,21 @@ public final class CaptureBody {
     }
 
     /**
+     * Cap {@code bytes} at {@code max} and decode the prefix as UTF-8 text. Empty
+     * input returns an {@link #omitted} body with {@code emptyReason}. Used by
+     * hooks that already hold the full byte[] in memory and want a single call
+     * site for the truncation + decode path.
+     */
+    public static CaptureBody fromCappedBytes(byte[] bytes, int max, String emptyReason) {
+        if (bytes == null || bytes.length == 0) {
+            return omitted(null, -1L, null, emptyReason);
+        }
+        boolean truncated = bytes.length > max;
+        byte[] used = truncated ? java.util.Arrays.copyOf(bytes, max) : bytes;
+        return fromBytes(used, bytes.length, truncated, emptyReason);
+    }
+
+    /**
      * Decode {@code bytes} as UTF-8 text without consulting {@link BodyCapturePolicy}.
      * Null/empty bytes and decode failures turn into {@link #omitted} bodies whose
      * reason string is supplied by the caller so logs stay greppable.

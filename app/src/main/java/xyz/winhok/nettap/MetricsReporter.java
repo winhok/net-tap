@@ -19,6 +19,13 @@ public final class MetricsReporter {
     public static final String LAYER_CRONET_BIDI = "CRONET_BIDI";
     public static final String LAYER_GRPC = "GRPC";
     public static final String LAYER_HURL = "HURL";
+    public static final String LAYER_VOLLEY = "VOLLEY";
+    public static final String LAYER_FUEL = "FUEL";
+    public static final String LAYER_APACHE5 = "APACHE5";
+    public static final String LAYER_KTOR_CIO = "KTOR_CIO";
+    public static final String LAYER_ANDROID_ASYNC = "ANDROID_ASYNC";
+    public static final String LAYER_TLS_KEYLOG = "TLS_KEYLOG";
+    public static final String LAYER_CRONET_KEYLOG = "CRONET_KEYLOG";
 
     private static final ConcurrentHashMap<String, AtomicLong> COUNTERS = new ConcurrentHashMap<>();
 
