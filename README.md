@@ -1,6 +1,6 @@
 # Net-Tap — Universal HTTP Capture for Android (Xposed)
 
-An Xposed / LSPosed module that captures HTTP(S) traffic from **any Android app**, across the four transports that real apps actually use:
+An Xposed / LSPosed module that captures HTTP(S) traffic from **any Android app** at the application layer first, then emits TLS key material for encrypted transports that cannot be fully decoded in-process. Net-Tap does **not** disable certificate validation or certificate pinning.
 
 | Layer | What it covers |
 |---|---|
@@ -8,6 +8,8 @@ An Xposed / LSPosed module that captures HTTP(S) traffic from **any Android app*
 | **Cronet** | Stock `org.chromium.net.impl.CronetUrlRequest` and shaded variants (e.g. `com.ttnet.org.chromium.net.impl.*`); request + response body closure via `CronetUploadDataStream` and `CronetBidirectionalStream` |
 | **gRPC-over-OkHttp** | Hooks `io.grpc.internal.ClientCallImpl.start` / `sendMessage` and wraps the listener with a dynamic proxy so response messages, trailers and status codes are captured alongside the request metadata |
 | **`HttpURLConnection`** | Tees `getOutputStream()` / `getInputStream()` / `getErrorStream()` for Firebase, GMS, Facebook SDK, and legacy code paths |
+| **Higher-level clients** | Volley, Fuel, Apache HttpClient 5, Ktor CIO, and AndroidAsync where they bypass the core stacks above |
+| **TLS key log** | Conscrypt/JSSE key log plus Cronet/BoringSSL `ssl_key_log_file` injection, including known shaded Cronet builders such as TTNet |
 
 It also tracks per-layer install and capture counts via `MetricsReporter` so you can diagnose "which layer didn't land" on any given host.
 
@@ -22,12 +24,19 @@ It also tracks per-layer install and capture counts via `MetricsReporter` so you
 ## Output
 
 * JSON Lines at `/data/data/<pkg>/files/_okhttp_capture.jsonl` — one file per hooked app. Authoritative capture source (logcat drops chunks on large payloads, this file does not). When a record is written, bodies are captured up to `CaptureConfig.MAX_BODY_BYTES`; oversized or unsupported bodies (one-shot, duplex, opaque binary, unknown content type) are marked truncated or omitted with an explicit reason. Under sustained file-writer backpressure the oldest pending records may be dropped — watch for `filelogger backpressure: N lines dropped so far` in logcat.
+* NSS TLS key log at `/data/data/<pkg>/files/_tls_keylog.log` when Conscrypt/JSSE/Cronet key logging surfaces are reachable. Use this with a pcap in Wireshark for apps that use custom CAs, certificate pinning, or QUIC without disabling their TLS checks.
 * Chunked `CAPTURE_JSON` messages in logcat with the `NetTap` tag. Best-effort only — Android's per-uid logcat rate limiter silently drops chunks on large payloads, so don't try to reconstruct complete bodies from logcat. Records over `LOGCAT_MAX_JSON_CHARS` are skipped on this channel entirely; the JSONL file still receives them.
 
 To tail the capture file live (LSPosed implies root):
 
 ```bash
 adb shell 'su -c "tail -F /data/data/<pkg>/files/_okhttp_capture.jsonl"' | jq .
+```
+
+To tail TLS secrets live:
+
+```bash
+adb shell 'su -c "tail -F /data/data/<pkg>/files/_tls_keylog.log"'
 ```
 
 ## Hook installation order
@@ -45,6 +54,8 @@ Per host app, on `handleLoadPackage`:
 3. **Cronet** — `CronetUrlRequestHook` + `CronetBidirectionalStreamHook` + `CronetUploadDataProviderHook`, each matching stock + known shade prefixes.
 4. **gRPC** — `GrpcCallInstaller` hooks `ClientCallImpl.start` / `sendMessage`; the listener is wrapped via `GrpcListenerProxy`.
 5. **`HttpURLConnection`** — `HttpURLConnectionHook` tees the I/O streams.
+6. **Higher-level clients** — Volley, Fuel, Apache HttpClient 5, Ktor CIO, and AndroidAsync install independently when their classes are present.
+7. **TLS key log** — Conscrypt/JSSE and Cronet/BoringSSL key log hooks install independently. Cronet key log injection uses the same stock/shaded prefix resolver as the Cronet app-layer hooks, so bundled variants such as TTNet receive the `ssl_key_log_file` option too.
 
 Any layer that doesn't apply is logged and skipped; the others install independently.
 
@@ -80,3 +91,4 @@ Unit tests cover the pure-Java parts (body accumulators, header extraction, shad
 * **Proto payloads** — emitted as base64 blobs (`[grpc-proto base64:...]`) with no schema decoding.
 * **Application-layer socket protocols** — anything that isn't HTTP/HTTP/2 (protobuf-over-TCP frameworks, XMPP, SIP, WebRTC signaling, etc.) is out of scope.
 * **HTTP/2 SSLSocket fallback** — intentionally not implemented; the cost/benefit vs the existing layers doesn't justify the complexity of HPACK + h2 frame reassembly.
+* **TLS bypass** — intentionally not implemented by default. If a target app pins certificates, prefer the app-layer hooks and `_tls_keylog.log`; generic SSL bypass changes target behavior and still will not decode custom application encryption.

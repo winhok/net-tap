@@ -34,6 +34,10 @@ public final class CronetCandidates {
             "org.chromium.net.UrlRequest$Callback";
     public static final String CRONET_UPLOAD_DATA_STREAM_SUFFIX =
             "org.chromium.net.impl.CronetUploadDataStream";
+    public static final String CRONET_ENGINE_BUILDER_SUFFIX =
+            "org.chromium.net.CronetEngine$Builder";
+    public static final String CRONET_ENGINE_BUILDER_IMPL_SUFFIX =
+            "org.chromium.net.impl.CronetEngineBuilderImpl";
 
     private CronetCandidates() {
     }

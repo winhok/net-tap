@@ -1,6 +1,7 @@
 package xyz.winhok.nettap;
 
 import java.lang.reflect.Method;
+import java.util.List;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -20,9 +21,6 @@ import de.robv.android.xposed.XposedHelpers;
  * experimental options are merged, not overwritten.
  */
 public final class CronetKeyLogHook {
-
-    private static final String BUILDER = "org.chromium.net.CronetEngine$Builder";
-    private static final String BUILDER_IMPL = "org.chromium.net.impl.CronetEngineBuilderImpl";
 
     private CronetKeyLogHook() {
     }
@@ -46,8 +44,16 @@ public final class CronetKeyLogHook {
             throw new RuntimeException("cronet-keylog-no-ctx");
         }
         int surfaces = 0;
-        surfaces += hookBuilderSetExperimentalOptions(classLoader, path) ? 1 : 0;
-        surfaces += hookBuilderImplBuild(classLoader, path) ? 1 : 0;
+        List<Class<?>> builders = CronetCandidates.resolveAllWithSuffix(
+                classLoader, CronetCandidates.CRONET_ENGINE_BUILDER_SUFFIX);
+        for (Class<?> builder : builders) {
+            surfaces += hookBuilderSetExperimentalOptions(builder, path) ? 1 : 0;
+        }
+        List<Class<?>> builderImpls = CronetCandidates.resolveAllWithSuffix(
+                classLoader, CronetCandidates.CRONET_ENGINE_BUILDER_IMPL_SUFFIX);
+        for (Class<?> builderImpl : builderImpls) {
+            surfaces += hookBuilderImplBuild(builderImpl, path) ? 1 : 0;
+        }
         if (surfaces == 0) {
             throw new RuntimeException("cronet-keylog-no-builder");
         }
@@ -57,8 +63,7 @@ public final class CronetKeyLogHook {
         MetricsReporter.incInstalled(packageName, MetricsReporter.LAYER_CRONET_KEYLOG);
     }
 
-    private static boolean hookBuilderSetExperimentalOptions(ClassLoader classLoader, String path) {
-        Class<?> builder = XposedHelpers.findClassIfExists(BUILDER, classLoader);
+    private static boolean hookBuilderSetExperimentalOptions(Class<?> builder, String path) {
         if (builder == null) {
             return false;
         }
@@ -98,8 +103,7 @@ public final class CronetKeyLogHook {
      * private {@code experimentalOptions} field before the native builder
      * hands off to BoringSSL.
      */
-    private static boolean hookBuilderImplBuild(ClassLoader classLoader, String path) {
-        Class<?> impl = XposedHelpers.findClassIfExists(BUILDER_IMPL, classLoader);
+    private static boolean hookBuilderImplBuild(Class<?> impl, String path) {
         if (impl == null) {
             return false;
         }
@@ -113,34 +117,13 @@ public final class CronetKeyLogHook {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) {
                         try {
-                            Object current = null;
-                            try {
-                                current = XposedHelpers.getObjectField(
-                                        param.thisObject, "mExperimentalOptions");
-                            } catch (Throwable ignored) {
-                            }
-                            if (current == null) {
-                                try {
-                                    current = XposedHelpers.getObjectField(
-                                            param.thisObject, "experimentalOptions");
-                                } catch (Throwable ignored) {
-                                }
-                            }
                             String merged = mergeKeyLogPath(
-                                    current == null ? null : current.toString(), path);
-                            try {
-                                XposedHelpers.setObjectField(
-                                        param.thisObject, "mExperimentalOptions", merged);
-                            } catch (Throwable mFieldErr) {
-                                try {
-                                    XposedHelpers.setObjectField(
-                                            param.thisObject, "experimentalOptions", merged);
-                                } catch (Throwable altErr) {
-                                    NetTap.getXposedLogger().logSafe(
-                                            "cronet-keylog neither m/experimentalOptions "
-                                                    + "field settable: %s / %s",
-                                            mFieldErr, altErr);
-                                }
+                                    readExperimentalOptions(param.thisObject), path);
+                            Throwable writeErr = writeExperimentalOptions(param.thisObject, merged);
+                            if (writeErr != null) {
+                                NetTap.getXposedLogger().logSafe(
+                                        "cronet-keylog neither m/experimentalOptions "
+                                                + "field settable: %s", writeErr);
                             }
                         } catch (Throwable e) {
                             NetTap.getXposedLogger().logSafe(
@@ -184,16 +167,32 @@ public final class CronetKeyLogHook {
         return "{" + inject + "," + body + "}";
     }
 
-    private static String resolveKeyLogPath() {
-        try {
-            Object context = xdroid.core.Global.getContext();
-            if (context instanceof android.content.Context) {
-                java.io.File f = ((android.content.Context) context).getFileStreamPath(
-                        CaptureConfig.TLS_KEYLOG_FILENAME);
-                return f == null ? null : f.getAbsolutePath();
+    private static final String[] EXPERIMENTAL_OPTIONS_FIELDS =
+            { "mExperimentalOptions", "experimentalOptions" };
+
+    private static String readExperimentalOptions(Object target) {
+        for (String field : EXPERIMENTAL_OPTIONS_FIELDS) {
+            try {
+                Object value = XposedHelpers.getObjectField(target, field);
+                if (value != null) {
+                    return value.toString();
+                }
+            } catch (Throwable ignored) {
             }
-        } catch (Throwable ignored) {
         }
         return null;
+    }
+
+    private static Throwable writeExperimentalOptions(Object target, String merged) {
+        Throwable last = null;
+        for (String field : EXPERIMENTAL_OPTIONS_FIELDS) {
+            try {
+                XposedHelpers.setObjectField(target, field, merged);
+                return null;
+            } catch (Throwable e) {
+                last = e;
+            }
+        }
+        return last;
     }
 }
