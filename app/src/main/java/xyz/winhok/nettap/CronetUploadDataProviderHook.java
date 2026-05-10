@@ -1,11 +1,12 @@
 package xyz.winhok.nettap;
 
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -24,6 +25,7 @@ public final class CronetUploadDataProviderHook {
     private static final CronetInstallRegistry INSTALL_REGISTRY = new CronetInstallRegistry();
     private static final Map<Object, Object> STREAM_TO_REQUEST =
             Collections.synchronizedMap(new WeakHashMap<Object, Object>());
+    private static final ConcurrentHashMap<Class<?>, Field> BUFFER_FIELD_CACHE = new ConcurrentHashMap<>();
 
     private CronetUploadDataProviderHook() {
     }
@@ -37,45 +39,17 @@ public final class CronetUploadDataProviderHook {
         if (candidates.isEmpty()) {
             return false;
         }
-
-        int hooked = 0;
-        for (Class<?> cls : candidates) {
-            String className = cls.getName();
-            synchronized (INSTALL_REGISTRY) {
-                if (INSTALL_REGISTRY.isInstalled(classLoader, className)) {
-                    hooked++;
-                    continue;
-                }
-                List<XC_MethodHook.Unhook> installedHooks = new ArrayList<>();
-                try {
-                    addAll(installedHooks, XposedBridge.hookAllConstructors(
+        return INSTALL_REGISTRY.installOnce(
+                classLoader,
+                candidates,
+                null,
+                packageName,
+                (cls, collector) -> {
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllConstructors(
                             cls, new CtorHook()));
-                    addAll(installedHooks, XposedBridge.hookAllMethods(
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
                             cls, "onReadSucceeded", new OnReadSucceededHook()));
-                    INSTALL_REGISTRY.markInstalled(classLoader, className);
-                    NetTap.getXposedLogger().log(
-                            "installed hook: %s", className);
-                    hooked++;
-                } catch (Throwable e) {
-                    for (int i = installedHooks.size() - 1; i >= 0; i--) {
-                        try {
-                            installedHooks.get(i).unhook();
-                        } catch (Throwable ignored) {
-                        }
-                    }
-                    INSTALL_REGISTRY.unmarkInstalled(classLoader, className);
-                    NetTap.getXposedLogger().log(
-                            "failed to install %s hook: %s", className, e);
-                }
-            }
-        }
-        return hooked > 0;
-    }
-
-    private static void addAll(List<XC_MethodHook.Unhook> dst, java.util.Set<XC_MethodHook.Unhook> src) {
-        if (src != null) {
-            dst.addAll(src);
-        }
+                });
     }
 
     private static final class CtorHook extends XC_MethodHook {
@@ -131,22 +105,20 @@ public final class CronetUploadDataProviderHook {
                 return null;
             }
             Class<?> cls = uploadStream.getClass();
-            while (cls != null) {
-                for (java.lang.reflect.Field f : cls.getDeclaredFields()) {
-                    if (ByteBuffer.class.isAssignableFrom(f.getType())) {
-                        try {
-                            f.setAccessible(true);
-                            Object v = f.get(uploadStream);
-                            if (v instanceof ByteBuffer) {
-                                return (ByteBuffer) v;
-                            }
-                        } catch (Throwable ignored) {
-                        }
-                    }
+            Field field = BUFFER_FIELD_CACHE.get(cls);
+            if (field == null) {
+                field = Reflect.findFieldByType(cls, ByteBuffer.class);
+                if (field == null) {
+                    return null;
                 }
-                cls = cls.getSuperclass();
+                BUFFER_FIELD_CACHE.putIfAbsent(cls, field);
             }
-            return null;
+            try {
+                Object v = field.get(uploadStream);
+                return v instanceof ByteBuffer ? (ByteBuffer) v : null;
+            } catch (Throwable ignored) {
+                return null;
+            }
         }
     }
 }

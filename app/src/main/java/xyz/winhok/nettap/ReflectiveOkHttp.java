@@ -6,10 +6,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
-// FIXME(follow-up): consolidate returnTypesEquivalent with Reflect.typesEquivalent in a future cleanup step.
 public final class ReflectiveOkHttp {
     private static final String REQUEST_BODY_UNAVAILABLE = "request body unavailable";
     private static final String RESPONSE_BODY_UNAVAILABLE = "response body unavailable";
@@ -420,14 +418,10 @@ public final class ReflectiveOkHttp {
 
     private static String contentEncoding(Object owner) {
         try {
-            for (Map.Entry<String, String> entry : headers(owner).entrySet()) {
-                if ("content-encoding".equalsIgnoreCase(entry.getKey())) {
-                    return entry.getValue();
-                }
-            }
+            return CronetHeaders.valueIgnoreCase(headers(owner), "content-encoding");
         } catch (Throwable ignored) {
+            return null;
         }
-        return null;
     }
 
     private static String contentType(Object body) {
@@ -541,7 +535,7 @@ public final class ReflectiveOkHttp {
                 if (method.getParameterTypes().length != 0) {
                     continue;
                 }
-                if (returnTypesEquivalent(returnType, method.getReturnType())) {
+                if (Reflect.typesEquivalent(returnType, method.getReturnType())) {
                     matches.add(method);
                 }
             }
@@ -554,22 +548,6 @@ public final class ReflectiveOkHttp {
         Method picked = matches.get(0);
         picked.setAccessible(true);
         return picked;
-    }
-
-    private static boolean returnTypesEquivalent(Class<?> expected, Class<?> actual) {
-        if (expected == null || actual == null) {
-            return false;
-        }
-        if (expected.equals(actual)) {
-            return true;
-        }
-        if (expected.isPrimitive()) {
-            return primitiveWrapper(expected).equals(actual);
-        }
-        if (actual.isPrimitive()) {
-            return primitiveWrapper(actual).equals(expected);
-        }
-        return false;
     }
 
     private static boolean safeBoolean(Object target, String name) {

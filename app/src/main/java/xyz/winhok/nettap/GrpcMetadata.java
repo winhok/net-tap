@@ -56,20 +56,16 @@ final class GrpcMetadata {
     }
 
     private static Object[] findNamesAndValues(Object metadata) {
-        Class<?> c = metadata.getClass();
-        while (c != null) {
-            try {
-                Field f = c.getDeclaredField("namesAndValues");
-                f.setAccessible(true);
-                Object v = f.get(metadata);
-                if (v instanceof Object[]) {
-                    return (Object[]) v;
-                }
-            } catch (Throwable ignored) {
-            }
-            c = c.getSuperclass();
+        Field f = Reflect.findFieldByType(metadata.getClass(), Object[].class);
+        if (f == null) {
+            return null;
         }
-        return null;
+        try {
+            Object v = f.get(metadata);
+            return v instanceof Object[] ? (Object[]) v : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private static String asString(Object o) {

@@ -120,36 +120,35 @@ final class GrpcListenerProxy {
             if (status == null) {
                 return;
             }
+            int code = -1;
             try {
-                Object codeObj = status.getClass().getMethod("getCode").invoke(status);
-                int code = -1;
+                Object codeObj = Reflect.invokeNoArg(status, "getCode");
                 if (codeObj != null) {
                     try {
-                        Object v = codeObj.getClass().getMethod("value").invoke(codeObj);
+                        Object v = Reflect.invokeNoArg(codeObj, "value");
                         if (v instanceof Number) {
                             code = ((Number) v).intValue();
                         }
                     } catch (Throwable ignored) {
                     }
                 }
-                String description = null;
-                try {
-                    Object d = status.getClass().getMethod("getDescription").invoke(status);
-                    description = d == null ? null : d.toString();
-                } catch (Throwable ignored) {
-                }
-                synchronized (state.mutex) {
-                    state.statusCode = code;
-                    state.statusMessage = description;
-                }
             } catch (Throwable ignored) {
+            }
+            String description = null;
+            try {
+                Object d = Reflect.invokeNoArg(status, "getDescription");
+                description = d == null ? null : d.toString();
+            } catch (Throwable ignored) {
+            }
+            synchronized (state.mutex) {
+                state.statusCode = code;
+                state.statusMessage = description;
             }
         }
 
         private static byte[] tryToByteArray(Object message) {
             try {
-                Method m = message.getClass().getMethod("toByteArray");
-                Object r = m.invoke(message);
+                Object r = Reflect.invokeNoArg(message, "toByteArray");
                 if (r instanceof byte[]) {
                     return (byte[]) r;
                 }

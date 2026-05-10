@@ -1,5 +1,7 @@
 package xyz.winhok.nettap;
 
+import java.nio.charset.StandardCharsets;
+
 public final class CaptureBody {
     private final String contentType;
     private final long contentLength;
@@ -41,6 +43,57 @@ public final class CaptureBody {
             String omittedReason
     ) {
         return new CaptureBody(contentType, contentLength, encoding, false, null, omittedReason);
+    }
+
+    /**
+     * Decode {@code bytes} as UTF-8 text without consulting {@link BodyCapturePolicy}.
+     * Null/empty bytes and decode failures turn into {@link #omitted} bodies whose
+     * reason string is supplied by the caller so logs stay greppable.
+     */
+    public static CaptureBody fromBytes(
+            byte[] bytes,
+            long contentLength,
+            boolean truncated,
+            String emptyReason
+    ) {
+        if (bytes == null || bytes.length == 0) {
+            return omitted(null, contentLength, null, emptyReason);
+        }
+        try {
+            return text(null, contentLength, null, truncated,
+                    new String(bytes, StandardCharsets.UTF_8));
+        } catch (Throwable t) {
+            return omitted(null, contentLength, null, "decode failed");
+        }
+    }
+
+    /**
+     * Decode a Cronet response body accumulator's bytes under the standard
+     * {@link BodyCapturePolicy} rules, emitting the Cronet-specific
+     * omitted-reason strings used across hook and log output.
+     */
+    public static CaptureBody fromCronetResponseBytes(
+            byte[] bytes,
+            String contentType,
+            long contentLength,
+            String encoding,
+            boolean truncated
+    ) {
+        if (bytes == null || bytes.length == 0) {
+            return omitted(contentType, contentLength, encoding,
+                    "Cronet response body empty");
+        }
+        BodyCapturePolicy.Decision decision = BodyCapturePolicy.classify(contentType);
+        if (decision == BodyCapturePolicy.Decision.BINARY) {
+            return omitted(contentType, contentLength, encoding,
+                    "Cronet response body content-type is binary");
+        }
+        if (decision == BodyCapturePolicy.Decision.UNKNOWN) {
+            return omitted(contentType, contentLength, encoding,
+                    "Cronet response body content-type unsupported");
+        }
+        return text(contentType, contentLength, encoding, truncated,
+                new String(bytes, StandardCharsets.UTF_8));
     }
 
     public String toJson() {

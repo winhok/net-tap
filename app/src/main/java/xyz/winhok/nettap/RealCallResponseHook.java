@@ -1,19 +1,14 @@
 package xyz.winhok.nettap;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.TimeZone;
-import java.util.concurrent.atomic.AtomicLong;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedHelpers;
 
 /* okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() hook. */
 public class RealCallResponseHook extends XC_MethodHook {
+    private static final String ID_PREFIX = "real-call-response";
     private static final String STATE_EXTRA = "nettap.real_call_response_state";
-    private static final AtomicLong NEXT_ID = new AtomicLong();
 
     private final String packageName;
     private final String hookName;
@@ -34,7 +29,7 @@ public class RealCallResponseHook extends XC_MethodHook {
             NetTap.getXposedLogger().log("%s triggered: %s", hookName, url != null ? url : "(unknown url)");
             param.setObjectExtra(STATE_EXTRA, new HookState(System.nanoTime(), request));
         } catch (Throwable e) {
-            logFailure(hookName + " before hook failed: %s", e);
+            NetTap.getXposedLogger().logSafe(hookName + " before hook failed: %s", e);
         }
     }
 
@@ -44,11 +39,11 @@ public class RealCallResponseHook extends XC_MethodHook {
             Object response = param.getResult();
             Throwable throwable = param.getThrowable();
             Object request = requestFor(response, state == null ? null : state.request);
-            long durationMs = durationMs(state);
+            long durationMs = state == null ? 0L : CaptureEvent.elapsedMsSince(state.startedNanos);
 
             CaptureEvent event = CaptureEvent.complete(
-                    nextId(),
-                    timestamp(),
+                    CaptureEvent.nextId(ID_PREFIX),
+                    CaptureEvent.timestampNow(),
                     packageName,
                     hookName,
                     ReflectiveOkHttp.method(request),
@@ -66,7 +61,7 @@ public class RealCallResponseHook extends XC_MethodHook {
             );
             CaptureRecorder.record(event);
         } catch (Throwable e) {
-            logFailure(hookName + " after hook failed: %s", e);
+            NetTap.getXposedLogger().logSafe(hookName + " after hook failed: %s", e);
         }
     }
 
@@ -119,34 +114,6 @@ public class RealCallResponseHook extends XC_MethodHook {
             return responseRequest;
         }
         return fallback;
-    }
-
-    private static long durationMs(HookState state) {
-        if (state == null) {
-            return 0L;
-        }
-        long elapsedNanos = System.nanoTime() - state.startedNanos;
-        if (elapsedNanos <= 0L) {
-            return 0L;
-        }
-        return elapsedNanos / 1_000_000L;
-    }
-
-    private static String nextId() {
-        return "real-call-response-" + NEXT_ID.incrementAndGet();
-    }
-
-    private static String timestamp() {
-        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-        format.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return format.format(new Date(System.currentTimeMillis()));
-    }
-
-    private static void logFailure(String message, Throwable throwable) {
-        try {
-            NetTap.getXposedLogger().log(message, throwable);
-        } catch (Throwable ignored) {
-        }
     }
 
     private static final class HookState {

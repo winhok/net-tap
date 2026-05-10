@@ -1,25 +1,18 @@
 package xyz.winhok.nettap;
 
 import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
 import java.util.WeakHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 
 public final class CronetUrlRequestHook {
     private static final String HOOK_NAME = "CronetUrlRequest";
-    private static final AtomicLong NEXT_ID = new AtomicLong();
+    private static final String ID_PREFIX = "cronet-url-request";
     private static final CronetInstallRegistry INSTALL_REGISTRY = new CronetInstallRegistry();
     private static final Map<Object, HookState> STATES = Collections.synchronizedMap(
             new WeakHashMap<Object, HookState>()
@@ -32,7 +25,6 @@ public final class CronetUrlRequestHook {
         if (classLoader == null) {
             return false;
         }
-
         List<Class<?>> candidates = CronetCandidates.resolveAll(classLoader);
         if (candidates.isEmpty()) {
             NetTap.getXposedLogger().log(
@@ -41,73 +33,29 @@ public final class CronetUrlRequestHook {
             );
             return false;
         }
-
-        int hooked = 0;
-        for (int i = 0; i < candidates.size(); i++) {
-            Class<?> cronetUrlRequest = candidates.get(i);
-            String className = cronetUrlRequest.getName();
-            synchronized (INSTALL_REGISTRY) {
-                if (INSTALL_REGISTRY.isInstalled(classLoader, className)) {
-                    hooked++;
-                    continue;
-                }
-                List<XC_MethodHook.Unhook> installedHooks = new ArrayList<>();
-                try {
-                    addUnhooks(installedHooks, XposedBridge.hookAllConstructors(
-                            cronetUrlRequest, new ConstructorHook(packageName)));
-                    addUnhooks(installedHooks, XposedBridge.hookAllMethods(
-                            cronetUrlRequest, "onResponseStarted", new ResponseStartedHook()));
-                    addUnhooks(installedHooks, XposedBridge.hookAllMethods(
-                            cronetUrlRequest, "onRedirectReceived", new RedirectHook()));
-                    addUnhooks(installedHooks, XposedBridge.hookAllMethods(
-                            cronetUrlRequest, "onSucceeded", new SucceededHook()));
-                    addUnhooks(installedHooks, XposedBridge.hookAllMethods(
-                            cronetUrlRequest, "onError", new ErrorHook()));
-                    addUnhooks(installedHooks, XposedBridge.hookAllMethods(
-                            cronetUrlRequest, "onCanceled", new CanceledHook()));
-                    addUnhooks(installedHooks, XposedBridge.hookAllMethods(
-                            cronetUrlRequest, "onReadCompleted", new ReadCompletedHook()));
-                    addUnhooks(installedHooks, XposedBridge.hookAllMethods(
-                            cronetUrlRequest, "setHttpMethod", new SetHttpMethodHook()));
-                    INSTALL_REGISTRY.markInstalled(classLoader, className);
-                    NetTap.getXposedLogger().log("installed hook: %s", className);
-                    hooked++;
-                } catch (Throwable e) {
-                    rollbackHooks(installedHooks, className);
-                    INSTALL_REGISTRY.unmarkInstalled(classLoader, className);
-                    NetTap.getXposedLogger().log(
-                            "failed to install %s hook: %s", className, e);
-                }
-            }
-        }
-        return hooked > 0;
-    }
-
-    private static void addUnhooks(
-            List<XC_MethodHook.Unhook> target,
-            Set<XC_MethodHook.Unhook> unhooks
-    ) {
-        if (target != null && unhooks != null) {
-            target.addAll(unhooks);
-        }
-    }
-
-    private static void rollbackHooks(List<XC_MethodHook.Unhook> hooks, String className) {
-        if (hooks == null) {
-            return;
-        }
-        for (int i = hooks.size() - 1; i >= 0; i--) {
-            XC_MethodHook.Unhook hook = hooks.get(i);
-            if (hook == null) {
-                continue;
-            }
-            try {
-                hook.unhook();
-            } catch (Throwable e) {
-                NetTap.getXposedLogger().log(
-                        "failed to rollback %s hook: %s", className, e);
-            }
-        }
+        return INSTALL_REGISTRY.installOnce(
+                classLoader,
+                candidates,
+                MetricsReporter.LAYER_CRONET,
+                packageName,
+                (cls, collector) -> {
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllConstructors(
+                            cls, new ConstructorHook(packageName)));
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
+                            cls, "onResponseStarted", new ResponseStartedHook()));
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
+                            cls, "onRedirectReceived", new RedirectHook()));
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
+                            cls, "onSucceeded", new SucceededHook()));
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
+                            cls, "onError", new ErrorHook()));
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
+                            cls, "onCanceled", new CanceledHook()));
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
+                            cls, "onReadCompleted", new ReadCompletedHook()));
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
+                            cls, "setHttpMethod", new SetHttpMethodHook()));
+                });
     }
 
     private static final class ConstructorHook extends XC_MethodHook {
@@ -279,8 +227,8 @@ public final class CronetUrlRequestHook {
                 }
                 state.recorded = true;
                 event = CaptureEvent.complete(
-                        nextId(),
-                        timestamp(),
+                        CaptureEvent.nextId(ID_PREFIX),
+                        CaptureEvent.timestampNow(),
                         state.packageName,
                         hookName,
                         state.method,
@@ -291,7 +239,7 @@ public final class CronetUrlRequestHook {
                         state.responseMessage,
                         state.responseHeaders,
                         buildResponseBody(state),
-                        durationMs(state.startedNanos),
+                        CaptureEvent.elapsedMsSince(state.startedNanos),
                         error
                 );
                 state.requestBodyAccumulator = null;
@@ -303,11 +251,6 @@ public final class CronetUrlRequestHook {
         }
     }
 
-    /**
-     * Build the response-body {@link CaptureBody} for {@code state}, using
-     * any bytes captured by the {@link ReadCompletedHook}. Caller must hold
-     * {@code state}'s monitor; the method does no additional locking.
-     */
     static void attachRequestBodyChunk(
             Object request,
             ByteBuffer source,
@@ -339,25 +282,11 @@ public final class CronetUrlRequestHook {
                     null, -1L, null,
                     "Cronet request body not observed");
         }
-        byte[] bytes = accumulator.getBytes();
-        if (bytes == null || bytes.length == 0) {
-            return CaptureBody.omitted(
-                    null, accumulator.getTotalBytesObserved(), null,
-                    "Cronet request body empty");
-        }
-        try {
-            String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            return CaptureBody.text(
-                    null,
-                    accumulator.getTotalBytesObserved(),
-                    null,
-                    accumulator.isTruncated(),
-                    text);
-        } catch (Throwable t) {
-            return CaptureBody.omitted(
-                    null, accumulator.getTotalBytesObserved(), null,
-                    "Cronet request body decode failed");
-        }
+        return CaptureBody.fromBytes(
+                accumulator.getBytes(),
+                accumulator.getTotalBytesObserved(),
+                accumulator.isTruncated(),
+                "Cronet request body empty");
     }
 
     private static CaptureBody buildResponseBody(HookState state) {
@@ -368,27 +297,15 @@ public final class CronetUrlRequestHook {
                     "Cronet response body not observed"
             );
         }
-        String contentType = headerValue(state.responseHeaders, "content-type");
-        String encoding = headerValue(state.responseHeaders, "content-encoding");
-        return CronetResponseBodyDecoder.decodeCronetResponseBody(
+        String contentType = CronetHeaders.valueIgnoreCase(state.responseHeaders, "content-type");
+        String encoding = CronetHeaders.valueIgnoreCase(state.responseHeaders, "content-encoding");
+        return CaptureBody.fromCronetResponseBytes(
                 accumulator.getBytes(),
                 contentType,
-                encoding,
                 accumulator.getTotalBytesObserved(),
+                encoding,
                 accumulator.isTruncated()
         );
-    }
-
-    private static String headerValue(Map<String, String> headers, String name) {
-        if (headers == null || name == null) {
-            return null;
-        }
-        for (Map.Entry<String, String> entry : headers.entrySet()) {
-            if (entry.getKey() != null && name.equalsIgnoreCase(entry.getKey())) {
-                return entry.getValue();
-            }
-        }
-        return null;
     }
 
     private static HookState state(Object request) {
@@ -436,24 +353,6 @@ public final class CronetUrlRequestHook {
             return;
         }
         headers.put(name, value);
-    }
-
-    private static long durationMs(long startedNanos) {
-        long elapsedNanos = System.nanoTime() - startedNanos;
-        if (elapsedNanos <= 0L) {
-            return 0L;
-        }
-        return elapsedNanos / 1_000_000L;
-    }
-
-    private static String nextId() {
-        return "cronet-url-request-" + NEXT_ID.incrementAndGet();
-    }
-
-    private static String timestamp() {
-        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-        format.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return format.format(new Date(System.currentTimeMillis()));
     }
 
     private static final class HookState {

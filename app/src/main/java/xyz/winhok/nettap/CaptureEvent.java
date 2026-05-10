@@ -1,10 +1,47 @@
 package xyz.winhok.nettap;
 
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class CaptureEvent {
+
+    private static final ThreadLocal<SimpleDateFormat> TIMESTAMP_FORMAT = new ThreadLocal<SimpleDateFormat>() {
+        @Override
+        protected SimpleDateFormat initialValue() {
+            SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+            fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
+            return fmt;
+        }
+    };
+
+    private static final ConcurrentHashMap<String, AtomicLong> ID_COUNTERS = new ConcurrentHashMap<>();
+
+    /** Current wall-clock timestamp in the project's fixed UTC millisecond format. */
+    public static String timestampNow() {
+        return TIMESTAMP_FORMAT.get().format(new Date(System.currentTimeMillis()));
+    }
+
+    /** Elapsed milliseconds since {@code startNanos}, clamped to zero. */
+    public static long elapsedMsSince(long startNanos) {
+        return Math.max(0L, (System.nanoTime() - startNanos) / 1_000_000L);
+    }
+
+    /** Per-prefix monotonically-increasing id (e.g. {@code "hurl-7"}). */
+    public static String nextId(String prefix) {
+        AtomicLong counter = ID_COUNTERS.get(prefix);
+        if (counter == null) {
+            counter = ID_COUNTERS.computeIfAbsent(prefix, k -> new AtomicLong());
+        }
+        return prefix + "-" + counter.incrementAndGet();
+    }
+
     private final String id;
     private final String timestamp;
     private final String packageName;

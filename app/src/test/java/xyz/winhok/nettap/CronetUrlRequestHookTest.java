@@ -9,15 +9,10 @@ import java.nio.charset.StandardCharsets;
 
 public final class CronetUrlRequestHookTest {
 
-    // The decode logic lives on CronetResponseBodyDecoder rather than directly
-    // on CronetUrlRequestHook because the latter transitively links Xposed
-    // APIs (compileOnly) that are absent from the unit-test classpath.
-    // CronetUrlRequestHook delegates to this decoder at runtime.
-
     @Test
     public void decodeReturnsOmittedForBinaryContentType() {
-        CaptureBody body = CronetResponseBodyDecoder.decodeCronetResponseBody(
-                new byte[] { 1, 2, 3 }, "image/png", null, 3L, false);
+        CaptureBody body = CaptureBody.fromCronetResponseBytes(
+                new byte[] { 1, 2, 3 }, "image/png", 3L, null, false);
 
         String json = body.toJson();
         assertTrue(
@@ -32,8 +27,8 @@ public final class CronetUrlRequestHookTest {
 
     @Test
     public void decodeReturnsOmittedForUnknownContentType() {
-        CaptureBody body = CronetResponseBodyDecoder.decodeCronetResponseBody(
-                new byte[] { 1, 2, 3 }, "application/foo-bar", null, 3L, false);
+        CaptureBody body = CaptureBody.fromCronetResponseBytes(
+                new byte[] { 1, 2, 3 }, "application/foo-bar", 3L, null, false);
 
         String json = body.toJson();
         assertTrue(
@@ -47,8 +42,8 @@ public final class CronetUrlRequestHookTest {
     public void decodeReturnsTextForTextualContentType() {
         byte[] bytes = "{\"ok\":true}".getBytes(StandardCharsets.UTF_8);
 
-        CaptureBody body = CronetResponseBodyDecoder.decodeCronetResponseBody(
-                bytes, "application/json", null, bytes.length, false);
+        CaptureBody body = CaptureBody.fromCronetResponseBytes(
+                bytes, "application/json", bytes.length, null, false);
 
         String json = body.toJson();
         assertTrue(
@@ -67,8 +62,8 @@ public final class CronetUrlRequestHookTest {
 
     @Test
     public void decodeReturnsOmittedForEmptyBytes() {
-        CaptureBody body = CronetResponseBodyDecoder.decodeCronetResponseBody(
-                new byte[0], "application/json", null, 0L, false);
+        CaptureBody body = CaptureBody.fromCronetResponseBytes(
+                new byte[0], "application/json", 0L, null, false);
 
         String json = body.toJson();
         assertTrue(
@@ -80,8 +75,8 @@ public final class CronetUrlRequestHookTest {
 
     @Test
     public void decodeReturnsOmittedForNullBytes() {
-        CaptureBody body = CronetResponseBodyDecoder.decodeCronetResponseBody(
-                null, "application/json", null, 0L, false);
+        CaptureBody body = CaptureBody.fromCronetResponseBytes(
+                null, "application/json", 0L, null, false);
 
         String json = body.toJson();
         assertTrue(
@@ -95,8 +90,8 @@ public final class CronetUrlRequestHookTest {
     public void decodePropagatesTruncatedAndContentLength() {
         byte[] bytes = "abc".getBytes(StandardCharsets.UTF_8);
 
-        CaptureBody body = CronetResponseBodyDecoder.decodeCronetResponseBody(
-                bytes, "text/plain", "identity", 9999L, true);
+        CaptureBody body = CaptureBody.fromCronetResponseBytes(
+                bytes, "text/plain", 9999L, "identity", true);
 
         String json = body.toJson();
         assertTrue(

@@ -18,27 +18,20 @@ public final class CaptureRecorder {
         try {
             json = event.toJson();
         } catch (Throwable e) {
-            logFailure("failed to serialize capture event: %s", e);
+            NetTap.getXposedLogger().logSafe("failed to serialize capture event: %s", e);
             return;
         }
 
         try {
             CAPTURE_FILE_LOGGER.logRawLine(json);
         } catch (Throwable e) {
-            logFailure("failed to write capture event: %s", e);
+            NetTap.getXposedLogger().logSafe("failed to write capture event: %s", e);
         }
 
         try {
             LogcatJsonLogger.emit(event.getId(), json, NetTap.getXposedLogger());
         } catch (Throwable e) {
-            logFailure("failed to emit capture event to logcat: %s", e);
-        }
-    }
-
-    private static void logFailure(String message, Throwable throwable) {
-        try {
-            NetTap.getXposedLogger().log(message, throwable);
-        } catch (Throwable ignored) {
+            NetTap.getXposedLogger().logSafe("failed to emit capture event to logcat: %s", e);
         }
     }
 }

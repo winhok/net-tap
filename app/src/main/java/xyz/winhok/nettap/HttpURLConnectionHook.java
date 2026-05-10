@@ -4,16 +4,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.text.SimpleDateFormat;
 import java.util.Collections;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.WeakHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -29,7 +24,7 @@ import de.robv.android.xposed.XposedHelpers;
 public final class HttpURLConnectionHook {
 
     private static final String HOOK_NAME = "HttpURLConnection";
-    private static final AtomicLong NEXT_ID = new AtomicLong();
+    private static final String ID_PREFIX = "hurl";
     private static final Map<Object, HookState> STATES =
             Collections.synchronizedMap(new WeakHashMap<Object, HookState>());
 
@@ -267,19 +262,19 @@ public final class HttpURLConnectionHook {
                     return;
                 }
                 state.recorded = true;
-                CaptureBody reqBody = buildBody(
+                CaptureBody reqBody = CaptureBody.fromBytes(
                         state.requestTee == null ? null : state.requestTee.capturedBytes(),
-                        state.requestTee != null && state.requestTee.isTruncated(),
                         state.requestTee == null ? 0L : state.requestTee.totalObserved(),
+                        state.requestTee != null && state.requestTee.isTruncated(),
                         "no request body");
-                CaptureBody resBody = buildBody(
+                CaptureBody resBody = CaptureBody.fromBytes(
                         state.responseTee == null ? null : state.responseTee.capturedBytes(),
-                        state.responseTee != null && state.responseTee.isTruncated(),
                         state.responseTee == null ? 0L : state.responseTee.totalObserved(),
+                        state.responseTee != null && state.responseTee.isTruncated(),
                         "no response body observed");
                 event = CaptureEvent.complete(
-                        "hurl-" + NEXT_ID.incrementAndGet(),
-                        timestamp(),
+                        CaptureEvent.nextId(ID_PREFIX),
+                        CaptureEvent.timestampNow(),
                         state.packageName,
                         HOOK_NAME,
                         state.method,
@@ -290,7 +285,7 @@ public final class HttpURLConnectionHook {
                         state.responseMessage == null ? "" : state.responseMessage,
                         state.responseHeaders,
                         resBody,
-                        Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L),
+                        CaptureEvent.elapsedMsSince(state.startedNanos),
                         error
                 );
                 state.requestTee = null;
@@ -303,18 +298,6 @@ public final class HttpURLConnectionHook {
             }
         } finally {
             STATES.remove(conn);
-        }
-    }
-
-    private static CaptureBody buildBody(byte[] bytes, boolean truncated, long observed, String emptyReason) {
-        if (bytes == null || bytes.length == 0) {
-            return CaptureBody.omitted(null, observed, null, emptyReason);
-        }
-        try {
-            String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            return CaptureBody.text(null, observed, null, truncated, text);
-        } catch (Throwable t) {
-            return CaptureBody.omitted(null, observed, null, "decode failed");
         }
     }
 
@@ -348,12 +331,6 @@ public final class HttpURLConnectionHook {
             out.put(String.valueOf(k), value);
         }
         return out;
-    }
-
-    private static String timestamp() {
-        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-        fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return fmt.format(new Date(System.currentTimeMillis()));
     }
 
     private static final class HookState {

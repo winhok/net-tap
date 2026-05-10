@@ -1,17 +1,11 @@
 package xyz.winhok.nettap;
 
 import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.WeakHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -26,7 +20,7 @@ import de.robv.android.xposed.XposedBridge;
 public final class CronetBidirectionalStreamHook {
 
     private static final String HOOK_NAME = "CronetBidirectionalStream";
-    private static final AtomicLong NEXT_ID = new AtomicLong();
+    private static final String ID_PREFIX = "cronet-bidi";
     private static final CronetInstallRegistry INSTALL_REGISTRY = new CronetInstallRegistry();
     private static final Map<Object, BidiState> STATES = Collections.synchronizedMap(
             new WeakHashMap<Object, BidiState>());
@@ -43,60 +37,27 @@ public final class CronetBidirectionalStreamHook {
         if (candidates.isEmpty()) {
             return false;
         }
-
-        int hooked = 0;
-        for (Class<?> cls : candidates) {
-            String className = cls.getName();
-            synchronized (INSTALL_REGISTRY) {
-                if (INSTALL_REGISTRY.isInstalled(classLoader, className)) {
-                    hooked++;
-                    continue;
-                }
-                List<XC_MethodHook.Unhook> installedHooks = new ArrayList<>();
-                try {
-                    addAll(installedHooks, XposedBridge.hookAllConstructors(
+        return INSTALL_REGISTRY.installOnce(
+                classLoader,
+                candidates,
+                MetricsReporter.LAYER_CRONET_BIDI,
+                packageName,
+                (cls, collector) -> {
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllConstructors(
                             cls, new CtorHook(packageName)));
-                    addAll(installedHooks, XposedBridge.hookAllMethods(
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
                             cls, "onResponseHeadersReceived", new HeadersHook()));
-                    addAll(installedHooks, XposedBridge.hookAllMethods(
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
                             cls, "onReadCompleted", new ReadHook()));
-                    addAll(installedHooks, XposedBridge.hookAllMethods(
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
                             cls, "onWriteCompleted", new WriteHook()));
-                    addAll(installedHooks, XposedBridge.hookAllMethods(
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
                             cls, "onSucceeded", new SucceededHook()));
-                    addAll(installedHooks, XposedBridge.hookAllMethods(
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
                             cls, "onFailed", new FailedHook()));
-                    addAll(installedHooks, XposedBridge.hookAllMethods(
+                    CronetInstallRegistry.addAll(collector, XposedBridge.hookAllMethods(
                             cls, "onCanceled", new CanceledHook()));
-                    INSTALL_REGISTRY.markInstalled(classLoader, className);
-                    NetTap.getXposedLogger().log(
-                            "installed hook: %s", className);
-                    try {
-                        MetricsReporter.incInstalled(
-                                packageName, MetricsReporter.LAYER_CRONET_BIDI);
-                    } catch (Throwable ignored) {
-                    }
-                    hooked++;
-                } catch (Throwable e) {
-                    for (int i = installedHooks.size() - 1; i >= 0; i--) {
-                        try {
-                            installedHooks.get(i).unhook();
-                        } catch (Throwable ignored) {
-                        }
-                    }
-                    INSTALL_REGISTRY.unmarkInstalled(classLoader, className);
-                    NetTap.getXposedLogger().log(
-                            "failed to install %s hook: %s", className, e);
-                }
-            }
-        }
-        return hooked > 0;
-    }
-
-    private static void addAll(List<XC_MethodHook.Unhook> dst, java.util.Set<XC_MethodHook.Unhook> src) {
-        if (src != null) {
-            dst.addAll(src);
-        }
+                });
     }
 
     private static final class CtorHook extends XC_MethodHook {
@@ -228,8 +189,8 @@ public final class CronetBidirectionalStreamHook {
                 }
                 state.recorded = true;
                 event = CaptureEvent.complete(
-                        "cronet-bidi-" + NEXT_ID.incrementAndGet(),
-                        timestamp(),
+                        CaptureEvent.nextId(ID_PREFIX),
+                        CaptureEvent.timestampNow(),
                         state.packageName,
                         hookName,
                         null,
@@ -240,7 +201,7 @@ public final class CronetBidirectionalStreamHook {
                         null,
                         state.responseHeaders,
                         bodyFrom(state.responseBody, "cronet bidi response body not observed"),
-                        Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L),
+                        CaptureEvent.elapsedMsSince(state.startedNanos),
                         error
                 );
                 state.requestBody = null;
@@ -260,18 +221,11 @@ public final class CronetBidirectionalStreamHook {
         if (acc == null) {
             return CaptureBody.omitted(null, -1L, null, emptyReason);
         }
-        byte[] bytes = acc.getBytes();
-        if (bytes == null || bytes.length == 0) {
-            return CaptureBody.omitted(null, acc.getTotalBytesObserved(), null, emptyReason);
-        }
-        try {
-            String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            return CaptureBody.text(
-                    null, acc.getTotalBytesObserved(), null, acc.isTruncated(), text);
-        } catch (Throwable t) {
-            return CaptureBody.omitted(
-                    null, acc.getTotalBytesObserved(), null, "decode failed");
-        }
+        return CaptureBody.fromBytes(
+                acc.getBytes(),
+                acc.getTotalBytesObserved(),
+                acc.isTruncated(),
+                emptyReason);
     }
 
     private static LinkedHashMap<String, String> extractHeadersFromInfo(Object info) {
@@ -280,8 +234,7 @@ public final class CronetBidirectionalStreamHook {
             return out;
         }
         try {
-            java.lang.reflect.Method m = info.getClass().getMethod("getAllHeaders");
-            Object raw = m.invoke(info);
+            Object raw = Reflect.invokeNoArg(info, "getAllHeaders");
             if (raw instanceof Map) {
                 for (Object e : ((Map<?, ?>) raw).entrySet()) {
                     Map.Entry<?, ?> me = (Map.Entry<?, ?>) e;
@@ -303,19 +256,13 @@ public final class CronetBidirectionalStreamHook {
             return fallback;
         }
         try {
-            Object code = info.getClass().getMethod("getHttpStatusCode").invoke(info);
+            Object code = Reflect.invokeNoArg(info, "getHttpStatusCode");
             if (code instanceof Number) {
                 return ((Number) code).intValue();
             }
         } catch (Throwable ignored) {
         }
         return fallback;
-    }
-
-    private static String timestamp() {
-        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-        fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return fmt.format(new Date(System.currentTimeMillis()));
     }
 
     private static final class BidiState {

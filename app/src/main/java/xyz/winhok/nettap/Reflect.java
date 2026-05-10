@@ -350,7 +350,7 @@ public final class Reflect {
         return sb.append(')').toString();
     }
 
-    private static boolean typesEquivalent(Class<?> expected, Class<?> actual) {
+    static boolean typesEquivalent(Class<?> expected, Class<?> actual) {
         if (expected == null || actual == null) {
             return expected == actual;
         }
@@ -370,7 +370,7 @@ public final class Reflect {
         return type == long.class || type == Long.class;
     }
 
-    private static Class<?> primitiveWrapper(Class<?> primitiveType) {
+    static Class<?> primitiveWrapper(Class<?> primitiveType) {
         if (primitiveType == boolean.class) {
             return Boolean.class;
         }

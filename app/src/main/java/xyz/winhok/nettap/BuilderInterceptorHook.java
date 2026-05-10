@@ -3,19 +3,14 @@ package xyz.winhok.nettap;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.TimeZone;
-import java.util.concurrent.atomic.AtomicLong;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedHelpers;
 
 public final class BuilderInterceptorHook extends XC_MethodHook {
     private static final String HOOK_NAME = "OkHttpClient.Builder.interceptor";
-    private static final AtomicLong NEXT_ID = new AtomicLong();
+    private static final String ID_PREFIX = "builder-interceptor";
 
     private final String packageName;
     private final Class<?> interceptorClass;
@@ -101,8 +96,8 @@ public final class BuilderInterceptorHook extends XC_MethodHook {
             try {
                 Object eventRequest = requestFor(response, request);
                 CaptureEvent event = CaptureEvent.complete(
-                        nextId(),
-                        timestamp(),
+                        CaptureEvent.nextId(ID_PREFIX),
+                        CaptureEvent.timestampNow(),
                         packageName,
                         HOOK_NAME,
                         ReflectiveOkHttp.method(eventRequest),
@@ -115,15 +110,12 @@ public final class BuilderInterceptorHook extends XC_MethodHook {
                         response == null
                                 ? CaptureBody.omitted(null, -1L, null, "response unavailable")
                                 : ReflectiveOkHttp.responseBody(response),
-                        durationMs(startedNanos),
+                        CaptureEvent.elapsedMsSince(startedNanos),
                         failure == null ? null : String.valueOf(failure)
                 );
                 CaptureRecorder.record(event);
             } catch (Throwable e) {
-                try {
-                    NetTap.getXposedLogger().log("%s capture failed: %s", HOOK_NAME, e);
-                } catch (Throwable ignored) {
-                }
+                NetTap.getXposedLogger().logSafe("%s capture failed: %s", HOOK_NAME, e);
             }
         }
     }
@@ -163,23 +155,5 @@ public final class BuilderInterceptorHook extends XC_MethodHook {
             }
             current = cause;
         }
-    }
-
-    private static long durationMs(long startedNanos) {
-        long elapsedNanos = System.nanoTime() - startedNanos;
-        if (elapsedNanos <= 0L) {
-            return 0L;
-        }
-        return elapsedNanos / 1_000_000L;
-    }
-
-    private static String nextId() {
-        return "builder-interceptor-" + NEXT_ID.incrementAndGet();
-    }
-
-    private static String timestamp() {
-        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-        format.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return format.format(new Date(System.currentTimeMillis()));
     }
 }

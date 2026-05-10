@@ -3,14 +3,10 @@ package xyz.winhok.nettap;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.text.SimpleDateFormat;
 import android.util.Base64;
 import java.util.Collections;
-import java.util.Date;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.WeakHashMap;
 
 import de.robv.android.xposed.XC_MethodHook;
@@ -124,11 +120,10 @@ public final class GrpcCallInstaller {
                         state.responseBodyFirstMessage,
                         state.responseBodyObserved,
                         state.responseBodyTruncated);
-                long durationMs = Math.max(0L, (System.nanoTime() - state.startedNanos) / 1_000_000L);
                 int responseCode = mapGrpcStatusToHttp(state.statusCode);
                 event = CaptureEvent.complete(
                         state.id,
-                        timestamp(),
+                        CaptureEvent.timestampNow(),
                         state.packageName,
                         HOOK_NAME,
                         "POST",
@@ -139,7 +134,7 @@ public final class GrpcCallInstaller {
                         state.statusMessage == null ? "" : state.statusMessage,
                         new LinkedHashMap<>(state.responseHeaders),
                         resBody,
-                        durationMs,
+                        CaptureEvent.elapsedMsSince(state.startedNanos),
                         null
                 );
                 state.requestBodyFirstMessage = null;
@@ -184,12 +179,6 @@ public final class GrpcCallInstaller {
         }
     }
 
-    private static String timestamp() {
-        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-        fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return fmt.format(new Date(System.currentTimeMillis()));
-    }
-
     private static final class StartHook extends XC_MethodHook {
         private final String packageName;
         private final Class<?> listenerClass;
@@ -223,26 +212,36 @@ public final class GrpcCallInstaller {
             if (impl == null) {
                 return;
             }
+            Field methodDescriptor = Reflect.findFieldByTypeName(
+                    impl.getClass(), "io.grpc.MethodDescriptor");
+            if (methodDescriptor != null) {
+                extractMethodDescriptor(impl, methodDescriptor, state);
+            }
+            state.authority = findStringFieldByName(impl, "authority");
+        }
+
+        private static String findStringFieldByName(Object impl, String fieldName) {
             Class<?> cls = impl.getClass();
             while (cls != null) {
                 for (Field f : cls.getDeclaredFields()) {
-                    Class<?> t = f.getType();
-                    String tn = t == null ? "" : t.getName();
-                    if ("io.grpc.MethodDescriptor".equals(tn)) {
-                        extractMethodDescriptor(impl, f, state);
-                    } else if ("java.lang.String".equals(tn) && "authority".equalsIgnoreCase(f.getName())) {
-                        try {
-                            f.setAccessible(true);
-                            Object v = f.get(impl);
-                            if (v instanceof String) {
-                                state.authority = (String) v;
-                            }
-                        } catch (Throwable ignored) {
+                    if (f.getType() != String.class) {
+                        continue;
+                    }
+                    if (!fieldName.equalsIgnoreCase(f.getName())) {
+                        continue;
+                    }
+                    try {
+                        f.setAccessible(true);
+                        Object v = f.get(impl);
+                        if (v instanceof String) {
+                            return (String) v;
                         }
+                    } catch (Throwable ignored) {
                     }
                 }
                 cls = cls.getSuperclass();
             }
+            return null;
         }
 
         private static void extractMethodDescriptor(Object impl, Field f, GrpcCaptureState state) {
@@ -252,7 +251,7 @@ public final class GrpcCallInstaller {
                 if (md == null) {
                     return;
                 }
-                Object name = md.getClass().getMethod("getFullMethodName").invoke(md);
+                Object name = Reflect.invokeNoArg(md, "getFullMethodName");
                 if (name instanceof String) {
                     state.fullMethodName = (String) name;
                 }
@@ -280,8 +279,7 @@ public final class GrpcCallInstaller {
                 }
                 byte[] bytes = null;
                 try {
-                    Method m = message.getClass().getMethod("toByteArray");
-                    Object r = m.invoke(message);
+                    Object r = Reflect.invokeNoArg(message, "toByteArray");
                     if (r instanceof byte[]) {
                         bytes = (byte[]) r;
                     }

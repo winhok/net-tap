@@ -27,4 +27,15 @@ public class XposedLogger {
             .collect(Collectors.joining("\n"+this.prefix+": ", this.prefix+": ", ""));
         XposedBridge.log(prefixedMessage);
     }
+
+    /**
+     * Log-and-swallow variant used by hook paths where the log attempt itself
+     * must never propagate (e.g. reflection throws on a mangled XposedBridge).
+     */
+    public void logSafe(String message, Object ... objects) {
+        try {
+            log(message, objects);
+        } catch (Throwable ignored) {
+        }
+    }
 }

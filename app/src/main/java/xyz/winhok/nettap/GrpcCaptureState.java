@@ -2,7 +2,6 @@ package xyz.winhok.nettap;
 
 import java.lang.ref.WeakReference;
 import java.util.LinkedHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Per-gRPC-call mutable state. Populated across hooks (start, sendMessage,
@@ -14,7 +13,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * response fields.
  */
 final class GrpcCaptureState {
-    private static final AtomicLong NEXT_ID = new AtomicLong();
 
     final Object mutex = new Object();
     final String id;
@@ -41,6 +39,6 @@ final class GrpcCaptureState {
     GrpcCaptureState(String packageName) {
         this.packageName = packageName;
         this.startedNanos = System.nanoTime();
-        this.id = "grpc-" + NEXT_ID.incrementAndGet();
+        this.id = CaptureEvent.nextId("grpc");
     }
 }
