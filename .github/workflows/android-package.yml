@@ -1,0 +1,118 @@
+name: Android Package
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Build APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK tools
+        run: |
+          sdk_root="${HOME}/android-sdk"
+          tools_zip="${RUNNER_TEMP}/android-commandline-tools.zip"
+          tools_dir="${RUNNER_TEMP}/android-commandline-tools"
+
+          mkdir -p "${sdk_root}/cmdline-tools"
+          curl -fsSL \
+            "https://dl.google.com/android/repository/commandlinetools-linux-12266719_latest.zip" \
+            -o "${tools_zip}"
+          unzip -q "${tools_zip}" -d "${tools_dir}"
+          mv "${tools_dir}/cmdline-tools" "${sdk_root}/cmdline-tools/latest"
+
+          {
+            echo "ANDROID_HOME=${sdk_root}"
+            echo "ANDROID_SDK_ROOT=${sdk_root}"
+          } >> "${GITHUB_ENV}"
+
+          {
+            echo "${sdk_root}/cmdline-tools/latest/bin"
+            echo "${sdk_root}/platform-tools"
+          } >> "${GITHUB_PATH}"
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager --install "platforms;android-36.1" "build-tools;36.0.0" "platform-tools"
+
+      - name: Configure release signing
+        env:
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [[ -n "${KEYSTORE:-}" && -n "${STORE_PASSWORD:-}" && -n "${KEY_PASSWORD:-}" ]]; then
+            bash ./generate-keystore-config.sh
+          else
+            echo "Release signing secrets are not configured; release APK will be unsigned."
+          fi
+
+      - name: Build
+        run: ./gradlew lintRelease assembleDebug assembleRelease --no-daemon --stacktrace
+
+      - name: Collect APKs
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/net-tap-debug.apk
+          release_apk="$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' | head -n 1)"
+          if "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose "${release_apk}"; then
+            cp "${release_apk}" dist/net-tap-release.apk
+          else
+            cp "${release_apk}" dist/net-tap-release-unsigned.apk
+            echo "Release signing secrets are not configured; uploaded release APK is unsigned."
+          fi
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: net-tap-debug
+          path: dist/net-tap-debug.apk
+
+      - name: Upload release APK
+        if: hashFiles('dist/net-tap-release.apk') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: net-tap-release
+          path: dist/net-tap-release.apk
+
+      - name: Upload unsigned release APK
+        if: hashFiles('dist/net-tap-release-unsigned.apk') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: net-tap-release-unsigned
+          path: dist/net-tap-release-unsigned.apk
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! -f dist/net-tap-release.apk ]]; then
+            echo "Refusing to publish a GitHub Release without a signed release APK." >&2
+            echo "Configure KEYSTORE, STORE_PASSWORD, and KEY_PASSWORD repository secrets." >&2
+            exit 1
+          fi
+          gh release upload "${GITHUB_REF_NAME}" dist/net-tap-debug.apk dist/net-tap-release.apk --clobber \
+            || gh release create "${GITHUB_REF_NAME}" dist/net-tap-debug.apk dist/net-tap-release.apk --generate-notes

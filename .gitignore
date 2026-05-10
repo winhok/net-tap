@@ -1,0 +1,14 @@
+.DS_Store
+.idea
+.vscode
+*.iml
+.gradle
+/local.properties
+/keystore.properties
+/build
+/app/build
+/app/secret.keystore
+
+# Local tooling state (Claude Code, Oh-My-Claude Code). Never commit.
+.claude/
+.omc/
