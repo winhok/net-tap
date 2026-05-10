@@ -14,7 +14,7 @@ public final class JsonWriter {
         return Boolean.toString(value);
     }
 
-    public static String object(java.util.LinkedHashMap<String, String> values) {
+    public static String object(java.util.Map<String, String> values) {
         if (values == null) {
             return "null";
         }

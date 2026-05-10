@@ -25,7 +25,10 @@ import java.nio.ByteBuffer;
  * lock.
  */
 final class CronetBodyAccumulator {
+    private static final int SCRATCH_SIZE = 8192;
+
     private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    private byte[] scratch;
     private long totalBytesObserved;
     private boolean truncated;
 
@@ -61,12 +64,21 @@ final class CronetBodyAccumulator {
             int remainingCapacity = maxBytes <= 0 ? 0 : Math.max(0, maxBytes - buffer.size());
             int copyCount = Math.min(safeBytes, remainingCapacity);
             if (copyCount > 0) {
+                byte[] dst = scratch;
+                if (dst == null) {
+                    dst = new byte[SCRATCH_SIZE];
+                    scratch = dst;
+                }
                 ByteBuffer view = source.duplicate();
-                view.position(initialPosition);
-                view.limit(initialPosition + copyCount);
-                byte[] chunk = new byte[copyCount];
-                view.get(chunk);
-                buffer.write(chunk, 0, copyCount);
+                int offset = 0;
+                while (offset < copyCount) {
+                    int chunk = Math.min(dst.length, copyCount - offset);
+                    view.position(initialPosition + offset);
+                    view.limit(initialPosition + offset + chunk);
+                    view.get(dst, 0, chunk);
+                    buffer.write(dst, 0, chunk);
+                    offset += chunk;
+                }
             }
             if (copyCount < safeBytes) {
                 truncated = true;

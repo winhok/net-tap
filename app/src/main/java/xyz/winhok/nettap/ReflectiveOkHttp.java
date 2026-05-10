@@ -418,10 +418,68 @@ public final class ReflectiveOkHttp {
 
     private static String contentEncoding(Object owner) {
         try {
-            return CronetHeaders.valueIgnoreCase(headers(owner), "content-encoding");
+            return findHeaderValue(owner, "content-encoding");
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    /**
+     * Read a single header value without constructing the full headers map.
+     * Called twice per request ({@code contentEncoding} on both request and
+     * response owners) — building a {@link LinkedHashMap} each time wastes
+     * allocations. Falls back to the full-map scan only if the per-index
+     * {@code name(i) / value(i)} API isn't usable (e.g. namesAndValues field
+     * shape).
+     */
+    private static String findHeaderValue(Object headersOrOwner, String name) {
+        if (headersOrOwner == null || name == null) {
+            return null;
+        }
+        Object headers;
+        if (looksLikeHeaders(headersOrOwner)) {
+            headers = headersOrOwner;
+        } else {
+            try {
+                Object maybe = methodOrFieldValue(headersOrOwner, "headers");
+                headers = (maybe == headersOrOwner) ? null : maybe;
+            } catch (Throwable ignored) {
+                headers = null;
+            }
+        }
+        if (headers == null) {
+            return null;
+        }
+
+        Integer size = safeInteger(headers, "size");
+        if (size != null) {
+            try {
+                for (int index = 0; index < size; index++) {
+                    Object headerName = invoke(headers, "name", index);
+                    if (headerName != null && name.equalsIgnoreCase(String.valueOf(headerName))) {
+                        Object headerValue = invoke(headers, "value", index);
+                        return headerValue == null ? null : String.valueOf(headerValue);
+                    }
+                }
+                return null;
+            } catch (Throwable ignored) {
+                // fall through to namesAndValues fallback
+            }
+        }
+
+        try {
+            Object namesAndValues = fieldValue(headers, "namesAndValues");
+            if (namesAndValues instanceof String[]) {
+                String[] items = (String[]) namesAndValues;
+                for (int index = 0; index + 1 < items.length; index += 2) {
+                    if (items[index] != null && name.equalsIgnoreCase(items[index])) {
+                        return items[index + 1];
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     private static String contentType(Object body) {
@@ -573,6 +631,17 @@ public final class ReflectiveOkHttp {
             throw new NoSuchMethodException(name);
         }
 
+        // Fast path for no-arg calls: ReflectCache skips the scan + declared
+        // superclass walk on warm classes. All hot hook getters land here
+        // (method, url, code, message, contentType, contentLength).
+        if (args.length == 0) {
+            Method cached = ReflectCache.noArgMethod(target.getClass(), name);
+            if (cached == null) {
+                throw new NoSuchMethodException(name);
+            }
+            return invokeMethod(cached, target, args);
+        }
+
         Method method = findCompatiblePublicMethod(target.getClass(), name, args);
         if (method == null) {
             method = findCompatibleDeclaredMethod(target.getClass(), name, args);
@@ -580,9 +649,13 @@ public final class ReflectiveOkHttp {
         if (method == null) {
             throw new NoSuchMethodException(name);
         }
+        method.setAccessible(true);
+        return invokeMethod(method, target, args);
+    }
 
+    private static Object invokeMethod(Method method, Object target, Object[] args)
+            throws ReflectiveOperationException {
         try {
-            method.setAccessible(true);
             return method.invoke(target, args);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();

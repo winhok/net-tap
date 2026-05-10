@@ -1,6 +1,5 @@
 package xyz.winhok.nettap;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,8 +45,7 @@ public final class LogcatJsonLogger {
 
         for (int index = 0; index < safeValue.length(); ) {
             int codePoint = safeValue.codePointAt(index);
-            String next = new String(Character.toChars(codePoint));
-            int nextBytes = next.getBytes(StandardCharsets.UTF_8).length;
+            int nextBytes = utf8ByteLength(codePoint);
             if (nextBytes > maxBytes) {
                 throw new IllegalArgumentException("maxBytes is smaller than a single UTF-8 code point");
             }
@@ -58,7 +56,7 @@ public final class LogcatJsonLogger {
                 currentBytes = 0;
             }
 
-            current.append(next);
+            current.appendCodePoint(codePoint);
             currentBytes += nextBytes;
             index += Character.charCount(codePoint);
         }
@@ -67,8 +65,30 @@ public final class LogcatJsonLogger {
         return result;
     }
 
+    /** Arithmetic UTF-8 byte count for a single code point. */
+    private static int utf8ByteLength(int codePoint) {
+        if (codePoint < 0x80) {
+            return 1;
+        }
+        if (codePoint < 0x800) {
+            return 2;
+        }
+        if (codePoint < 0x10000) {
+            return 3;
+        }
+        return 4;
+    }
+
     public static void emit(String id, String json, XposedLogger logger) {
         if (logger == null) {
+            return;
+        }
+
+        int jsonLength = json == null ? 0 : json.length();
+        if (jsonLength > CaptureConfig.LOGCAT_MAX_JSON_CHARS) {
+            logger.log(
+                    "CAPTURE_JSON_OMITTED id=%s size=%d reason=logcat-size-gate",
+                    id, jsonLength);
             return;
         }
 

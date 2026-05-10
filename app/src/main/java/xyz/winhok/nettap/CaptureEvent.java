@@ -132,11 +132,11 @@ public final class CaptureEvent {
         appendField(result, "okhttpHook", JsonWriter.string(okhttpHook), false);
         appendField(result, "method", JsonWriter.string(method), false);
         appendField(result, "url", JsonWriter.string(url), false);
-        appendField(result, "requestHeaders", JsonWriter.object(new LinkedHashMap<>(requestHeaders)), false);
+        appendField(result, "requestHeaders", JsonWriter.object(requestHeaders), false);
         appendField(result, "requestBody", bodyJson(requestBody), false);
         appendField(result, "responseCode", JsonWriter.number(responseCode), false);
         appendField(result, "responseMessage", JsonWriter.string(responseMessage), false);
-        appendField(result, "responseHeaders", JsonWriter.object(new LinkedHashMap<>(responseHeaders)), false);
+        appendField(result, "responseHeaders", JsonWriter.object(responseHeaders), false);
         appendField(result, "responseBody", bodyJson(responseBody), false);
         appendField(result, "durationMs", JsonWriter.number(durationMs), false);
         appendField(result, "error", JsonWriter.string(error), false);

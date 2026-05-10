@@ -10,6 +10,7 @@ import xyz.winhok.nettap.ShadedClassRegistry.DiscoveredOkHttp;
 /* Log all HTTP requests across OkHttp, Cronet, gRPC-over-OkHttp, and java.net. */
 public class NetTap implements IXposedHookLoadPackage {
     private static String moduleName = "NetTap";
+    private static final String OKHTTP_HOOK_ID = "okhttp";
     private static XposedLogger xposedLogger;
 
     public static synchronized XposedLogger getXposedLogger() {
@@ -56,6 +57,29 @@ public class NetTap implements IXposedHookLoadPackage {
             return false;
         }
 
+        // Shared OkHttp install latch across all four layers. handleLoadPackage may
+        // fire more than once for the same classloader; without the latch every
+        // request would produce 2-4 duplicate JSONL events (one per layer that
+        // installed). Priority ladder (RealCall > Chain > Builder > Exchange)
+        // is preserved inside the latch.
+        java.util.concurrent.atomic.AtomicBoolean result =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        try {
+            boolean ran = InstallGuard.installOncePerLoader(
+                    OKHTTP_HOOK_ID,
+                    lpparam.classLoader,
+                    () -> result.set(installOkHttpHooksInner(lpparam, discovered)));
+            if (!ran) {
+                return InstallGuard.isInstalled(OKHTTP_HOOK_ID, lpparam.classLoader);
+            }
+            return result.get();
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().log("okhttp install wrapper failed: %s", e);
+            return false;
+        }
+    }
+
+    private boolean installOkHttpHooksInner(final LoadPackageParam lpparam, DiscoveredOkHttp discovered) {
         boolean realCallHookInstalled = installOkHttp4RealCallResponseHook(lpparam);
         if (!realCallHookInstalled) {
             realCallHookInstalled = installOkHttp3RealCallResponseHook(lpparam);

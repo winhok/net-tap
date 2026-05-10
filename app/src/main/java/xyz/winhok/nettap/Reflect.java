@@ -233,7 +233,7 @@ public final class Reflect {
         if (target == null) {
             throw new NoSuchMethodException(methodName);
         }
-        Method m = findMethod(target.getClass(), methodName);
+        Method m = ReflectCache.noArgMethod(target.getClass(), methodName);
         if (m == null) {
             throw new NoSuchMethodException(methodName);
         }
