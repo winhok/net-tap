@@ -106,7 +106,10 @@ public final class BodyCapturePolicy {
         return byteCount > CaptureConfig.MAX_BODY_BYTES;
     }
 
-    // subtype offset is recomputed in matchesTextualWhitelist; not worth refactoring.
+    public static boolean isFormUrlEncoded(String contentType) {
+        return "application/x-www-form-urlencoded".equals(normalize(contentType));
+    }
+
     /**
      * Lower-case the media type and strip any {@code ;parameter} suffix.
      * Returns {@code null} when the input is missing or malformed (no subtype).

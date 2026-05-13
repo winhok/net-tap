@@ -5,12 +5,21 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.GZIPInputStream;
 
 public final class ReflectiveOkHttp {
     private static final String REQUEST_BODY_UNAVAILABLE = "request body unavailable";
+    private static final String REQUEST_BODY_CAPTURE_FAILED = "request body capture failed";
     private static final String RESPONSE_BODY_UNAVAILABLE = "response body unavailable";
+    private static final int MAX_LOGGED_FAILURE_CLASSES = 128;
+    private static final Set<String> LOGGED_FAILURE_CLASSES =
+            Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
     private ReflectiveOkHttp() {
     }
@@ -145,11 +154,17 @@ public final class ReflectiveOkHttp {
         byte[] bytes;
         try {
             bytes = requestBodyBytes(request, body);
-        } catch (Throwable ignored) {
-            return CaptureBody.omitted(contentType, contentLength, encoding, "request body capture failed");
+        } catch (Throwable writeFailure) {
+            bytes = formBodyBytesFallback(body, contentType);
+            if (bytes == null) {
+                logRequestBodyCaptureFailure(body, writeFailure);
+                return CaptureBody.omitted(
+                        contentType, contentLength, encoding, REQUEST_BODY_CAPTURE_FAILED);
+            }
         }
         if (bytes == null) {
-            return CaptureBody.omitted(contentType, contentLength, encoding, "request body capture failed");
+            return CaptureBody.omitted(
+                    contentType, contentLength, encoding, REQUEST_BODY_CAPTURE_FAILED);
         }
 
         try {
@@ -307,6 +322,72 @@ public final class ReflectiveOkHttp {
         Object buffer = bufferClass.getDeclaredConstructor().newInstance();
         invoke(body, "writeTo", buffer);
         return (byte[]) invoke(buffer, "readByteArray");
+    }
+
+    private static byte[] formBodyBytesFallback(Object body, String contentType) {
+        if (!BodyCapturePolicy.isFormUrlEncoded(contentType)) {
+            return null;
+        }
+        Integer size = safeInteger(body, "size");
+        if (size == null || size.intValue() < 0) {
+            return null;
+        }
+
+        StringBuilder result = new StringBuilder();
+        for (int index = 0; index < size.intValue(); index++) {
+            String name = formPart(body, index, "encodedName");
+            String value = formPart(body, index, "encodedValue");
+            if (name == null || value == null) {
+                return null;
+            }
+            if (index > 0) {
+                result.append('&');
+            }
+            result.append(name).append('=').append(value);
+        }
+        return result.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static void logRequestBodyCaptureFailure(Object body, Throwable throwable) {
+        if (body == null) {
+            return;
+        }
+        Class<?> type = body.getClass();
+        // Stop-when-full keeps the log calm under burst traffic across many body
+        // types: clearing and re-adding would re-log every class on each cycle
+        // and races between threads could double-log.
+        if (LOGGED_FAILURE_CLASSES.size() >= MAX_LOGGED_FAILURE_CLASSES) {
+            return;
+        }
+        if (!LOGGED_FAILURE_CLASSES.add(type.getName())) {
+            return;
+        }
+        try {
+            NetTap.getXposedLogger().logSafe(
+                    "request body capture failed for %s methods=%s cause=%s",
+                    type.getName(),
+                    declaredMethodNames(type),
+                    throwable);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static String declaredMethodNames(Class<?> type) {
+        Method[] methods = type.getDeclaredMethods();
+        List<String> names = new ArrayList<>(methods.length);
+        for (Method method : methods) {
+            names.add(method.getName());
+        }
+        Collections.sort(names);
+        return names.toString();
+    }
+
+    private static String formPart(Object body, int index, String methodName) {
+        try {
+            return stringValue(invoke(body, methodName, index));
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private static DecodedBody decodeBodyBytes(byte[] bytes, String encoding, int maxBytes)

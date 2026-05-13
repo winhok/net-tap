@@ -79,19 +79,27 @@ public final class LogcatJsonLogger {
         return 4;
     }
 
+    public static boolean isOversized(String json) {
+        return json != null && json.length() > CaptureConfig.LOGCAT_MAX_JSON_CHARS;
+    }
+
     public static void emit(String id, String json, XposedLogger logger) {
         if (logger == null) {
             return;
         }
-
-        int jsonLength = json == null ? 0 : json.length();
-        if (jsonLength > CaptureConfig.LOGCAT_MAX_JSON_CHARS) {
+        if (isOversized(json)) {
             logger.log(
                     "CAPTURE_JSON_OMITTED id=%s size=%d reason=logcat-size-gate",
-                    id, jsonLength);
+                    id, json.length());
             return;
         }
+        emitChunksAlways(id, json, logger);
+    }
 
+    public static void emitChunksAlways(String id, String json, XposedLogger logger) {
+        if (logger == null) {
+            return;
+        }
         List<String> parts = utf8Chunks(json, CaptureConfig.LOGCAT_CHUNK_SIZE);
         int total = parts.size();
         for (int index = 0; index < total; index++) {

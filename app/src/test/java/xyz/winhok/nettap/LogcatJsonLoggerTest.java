@@ -80,6 +80,34 @@ public final class LogcatJsonLoggerTest {
     }
 
     @Test
+    public void emitOmitsOversizedJsonByDefault() {
+        RecordingLogger logger = new RecordingLogger();
+        String json = repeat('a', CaptureConfig.LOGCAT_MAX_JSON_CHARS + 1);
+
+        LogcatJsonLogger.emit("request-large", json, logger);
+
+        assertEquals(
+                Arrays.asList(
+                        "CAPTURE_JSON_OMITTED id=request-large size="
+                                + (CaptureConfig.LOGCAT_MAX_JSON_CHARS + 1)
+                                + " reason=logcat-size-gate"
+                ),
+                logger.messages
+        );
+    }
+
+    @Test
+    public void emitChunksOversizedJsonWhenForced() {
+        RecordingLogger logger = new RecordingLogger();
+        String json = repeat('a', CaptureConfig.LOGCAT_MAX_JSON_CHARS + 1);
+
+        LogcatJsonLogger.emitChunksAlways("request-large", json, logger);
+
+        assertTrue(logger.messages.size() > 1);
+        assertTrue(logger.messages.get(0).startsWith("CAPTURE_JSON part=1/"));
+    }
+
+    @Test
     public void emitIgnoresNullLogger() {
         LogcatJsonLogger.emit("request-1", "abcdef", null);
     }

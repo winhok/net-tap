@@ -43,6 +43,36 @@ public final class ReflectiveOkHttpBodyCaptureTest {
     }
 
     @Test
+    public void requestBodyCapturesFormBodyWhenWriteToFails() {
+        Request request = new Request.Builder()
+                .url("https://example.com/form")
+                .post(new ThrowingFormLikeRequestBody())
+                .build();
+
+        CaptureBody body = ReflectiveOkHttp.requestBody(request);
+
+        assertEquals(
+                "{\"contentType\":\"application/x-www-form-urlencoded\",\"contentLength\":17,"
+                        + "\"encoding\":null,\"truncated\":false,"
+                        + "\"text\":\"room_id=42&a=b+c\",\"omittedReason\":null}",
+                body.toJson()
+        );
+    }
+
+    @Test
+    public void requestBodyCaptureFailureKeepsStableOmittedReason() {
+        Request request = new Request.Builder()
+                .url("https://example.com/text")
+                .post(new ThrowingTextRequestBody())
+                .build();
+
+        CaptureBody body = ReflectiveOkHttp.requestBody(request);
+
+        assertTrue(body.toJson().contains(
+                "\"omittedReason\":\"request body capture failed\""));
+    }
+
+    @Test
     public void requestBodyOmitsBinaryBody() {
         Request request = new Request.Builder()
                 .url("https://example.com/upload")
@@ -226,6 +256,46 @@ public final class ReflectiveOkHttpBodyCaptureTest {
 
         public void writeTo(BufferedSink sink) throws IOException {
             throw new AssertionError("large request body should not be written");
+        }
+    }
+
+    private static final class ThrowingFormLikeRequestBody extends RequestBody {
+        public MediaType contentType() {
+            return MediaType.get("application/x-www-form-urlencoded");
+        }
+
+        public long contentLength() {
+            return 17L;
+        }
+
+        public int size() {
+            return 2;
+        }
+
+        public String encodedName(int index) {
+            return index == 0 ? "room_id" : "a";
+        }
+
+        public String encodedValue(int index) {
+            return index == 0 ? "42" : "b+c";
+        }
+
+        public void writeTo(BufferedSink sink) throws IOException {
+            throw new IOException("simulated reflective writeTo failure");
+        }
+    }
+
+    private static final class ThrowingTextRequestBody extends RequestBody {
+        public MediaType contentType() {
+            return MediaType.get("text/plain");
+        }
+
+        public long contentLength() {
+            return 5L;
+        }
+
+        public void writeTo(BufferedSink sink) throws IOException {
+            throw new IOException("simulated write failure");
         }
     }
 
