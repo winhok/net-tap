@@ -38,7 +38,10 @@ public class NetTap implements IXposedHookLoadPackage {
 
         boolean tryInstall(LoadPackageParam lp) {
             try {
-                return installer.install(lp.packageName, lp.classLoader);
+                boolean installed = installer.install(lp.packageName, lp.classLoader);
+                NetTap.getXposedLogger().log(
+                        "hook attempt result: %s installed=%s", tag, installed);
+                return installed;
             } catch (Throwable e) {
                 NetTap.getXposedLogger().log("%s install failed: %s", tag, e);
                 return false;
@@ -62,7 +65,11 @@ public class NetTap implements IXposedHookLoadPackage {
     );
 
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
-        NetTap.getXposedLogger().log("module loaded into: %s", lpparam.packageName);
+        NetTap.getXposedLogger().log(
+                "module loaded into: %s classLoader=%s process=%s",
+                lpparam.packageName,
+                String.valueOf(lpparam.classLoader),
+                readStringField(lpparam, "processName"));
         if ("xyz.winhok.nettap".equals(lpparam.packageName)) {
             NetTap.getXposedLogger().log("skip hooking module UI process");
             return;
@@ -71,8 +78,15 @@ public class NetTap implements IXposedHookLoadPackage {
 
         DiscoveredOkHttp discovered = ShadedOkHttpDiscovery.discover(
                 lpparam.packageName, lpparam.classLoader);
+        NetTap.getXposedLogger().log(
+                "okhttp discovery: package=%s hasAny=%s detail=%s",
+                lpparam.packageName,
+                discovered != null && discovered.hasAny(),
+                String.valueOf(discovered));
 
         boolean anyInstalled = installOkHttpHooks(lpparam, discovered);
+        NetTap.getXposedLogger().log(
+                "hook attempt result: %s installed=%s", OKHTTP_HOOK_ID, anyInstalled);
         for (HookSpec spec : STANDARD_HOOKS) {
             anyInstalled |= spec.tryInstall(lpparam);
         }
@@ -116,6 +130,15 @@ public class NetTap implements IXposedHookLoadPackage {
         } catch (Throwable e) {
             NetTap.getXposedLogger().log("okhttp install wrapper failed: %s", e);
             return false;
+        }
+    }
+
+    private static String readStringField(Object target, String fieldName) {
+        try {
+            Object value = target.getClass().getField(fieldName).get(target);
+            return String.valueOf(value);
+        } catch (Throwable ignored) {
+            return "unknown";
         }
     }
 

@@ -5,13 +5,15 @@ An Xposed / LSPosed module that captures HTTP(S) traffic from **any Android app*
 | Layer | What it covers |
 |---|---|
 | **OkHttp 3 / 4** | Stock `okhttp3.*` and apps where OkHttp has been R8-obfuscated or relocated — the installer falls back through four hook strategies until one sticks |
-| **Cronet** | Stock `org.chromium.net.impl.CronetUrlRequest` and shaded variants (e.g. `com.ttnet.org.chromium.net.impl.*`); request + response body closure via `CronetUploadDataStream` and `CronetBidirectionalStream` |
+| **Cronet** | Stock `org.chromium.net.impl.CronetUrlRequest` in the canonical Chromium namespace; request + response body closure via `CronetUploadDataStream` and `CronetBidirectionalStream` |
 | **gRPC-over-OkHttp** | Hooks `io.grpc.internal.ClientCallImpl.start` / `sendMessage` and wraps the listener with a dynamic proxy so response messages, trailers and status codes are captured alongside the request metadata |
 | **`HttpURLConnection`** | Tees `getOutputStream()` / `getInputStream()` / `getErrorStream()` for Firebase, GMS, Facebook SDK, and legacy code paths |
-| **Higher-level clients** | Volley, Fuel, Apache HttpClient 5, Ktor CIO, and AndroidAsync where they bypass the core stacks above |
-| **TLS key log** | Conscrypt/JSSE key log plus Cronet/BoringSSL `ssl_key_log_file` injection, including known shaded Cronet builders such as TTNet |
+| **Higher-level open clients** | Volley, Fuel, Apache HttpClient 5, Ktor CIO, and AndroidAsync where they bypass the core stacks above |
+| **TLS key log** | Conscrypt/JSSE key log plus canonical Cronet/BoringSSL `ssl_key_log_file` injection |
 
 It also tracks per-layer install and capture counts via `MetricsReporter` so you can diagnose "which layer didn't land" on any given host.
+
+Net-Tap keeps vendor-private SDK layers out of the default capture surface. It does not install hooks for app-specific API clients, private Retrofit-style stacks, or vendor-prefixed Cronet packages.
 
 ## What it captures per request
 
@@ -51,11 +53,11 @@ Per host app, on `handleLoadPackage`:
    2. `okhttp3.RealCall.getResponseWithInterceptorChain` (OkHttp 3)
    3. `RealInterceptorChain.proceed(Request)` (survives rename — works even on fully obfuscated builds)
    4. `Exchange.writeRequestHeaders` (request-only telemetry)
-3. **Cronet** — `CronetUrlRequestHook` + `CronetBidirectionalStreamHook` + `CronetUploadDataProviderHook`, each matching stock + known shade prefixes.
+3. **Cronet** — `CronetUrlRequestHook` + `CronetBidirectionalStreamHook` + `CronetUploadDataProviderHook`, each matching canonical `org.chromium.net.impl.*` classes.
 4. **gRPC** — `GrpcCallInstaller` hooks `ClientCallImpl.start` / `sendMessage`; the listener is wrapped via `GrpcListenerProxy`.
 5. **`HttpURLConnection`** — `HttpURLConnectionHook` tees the I/O streams.
-6. **Higher-level clients** — Volley, Fuel, Apache HttpClient 5, Ktor CIO, and AndroidAsync install independently when their classes are present.
-7. **TLS key log** — Conscrypt/JSSE and Cronet/BoringSSL key log hooks install independently. Cronet key log injection uses the same stock/shaded prefix resolver as the Cronet app-layer hooks, so bundled variants such as TTNet receive the `ssl_key_log_file` option too.
+6. **Higher-level open clients** — Volley, Fuel, Apache HttpClient 5, Ktor CIO, and AndroidAsync install independently when their classes are present.
+7. **TLS key log** — Conscrypt/JSSE and canonical Cronet/BoringSSL key log hooks install independently. Cronet key log injection uses the same canonical Cronet resolver as the Cronet app-layer hooks.
 
 Any layer that doesn't apply is logged and skipped; the others install independently.
 

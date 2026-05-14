@@ -1,6 +1,7 @@
 package xyz.winhok.nettap;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.List;
 
 import de.robv.android.xposed.XC_MethodHook;
@@ -16,8 +17,8 @@ import de.robv.android.xposed.XposedHelpers;
  * handshake time for both TCP (TLS 1.3) and UDP (QUIC) flows.
  *
  * <p>We hook {@code CronetEngine$Builder.setExperimentalOptions(String)} and
- * {@code CronetEngineBuilderImpl.build()} so that whichever builder the app
- * uses, {@code ssl_key_log_file} lands in the final engine config. Existing
+ * canonical {@code CronetEngineBuilderImpl} build methods so that
+ * {@code ssl_key_log_file} lands in the final engine config. Existing
  * experimental options are merged, not overwritten.
  */
 public final class CronetKeyLogHook {
@@ -102,9 +103,9 @@ public final class CronetKeyLogHook {
     }
 
     /**
-     * Some apps skip {@code setExperimentalOptions} entirely. Hook
-     * {@code CronetEngineBuilderImpl.build()} and inject the option via the
-     * private {@code experimentalOptions} field before the native builder
+     * Some apps skip {@code setExperimentalOptions} entirely. Hook canonical
+     * {@code CronetEngineBuilderImpl} build methods and inject the option via
+     * the private {@code experimentalOptions} field before the native builder
      * hands off to BoringSSL.
      */
     private static boolean hookBuilderImplBuild(Class<?> impl, String path) {
@@ -113,7 +114,7 @@ public final class CronetKeyLogHook {
         }
         int hooked = 0;
         for (Method m : impl.getDeclaredMethods()) {
-            if (!"build".equals(m.getName()) || m.getParameterTypes().length != 0) {
+            if (!isBuilderBuildCandidate(impl, m)) {
                 continue;
             }
             try {
@@ -142,10 +143,48 @@ public final class CronetKeyLogHook {
                 hooked++;
             } catch (Throwable e) {
                 NetTap.getXposedLogger().logSafe(
-                        "cronet-keylog CronetEngineBuilderImpl.build hook failed: %s", e);
+                        "cronet-keylog CronetEngineBuilderImpl build hook failed: %s", e);
             }
         }
         return hooked > 0;
+    }
+
+    static boolean isBuilderBuildCandidate(Class<?> builderClass, Method method) {
+        if (builderClass == null || method == null || method.getParameterTypes().length != 0) {
+            return false;
+        }
+        int modifiers = method.getModifiers();
+        if (Modifier.isStatic(modifiers) || Modifier.isAbstract(modifiers)
+                || Modifier.isNative(modifiers)) {
+            return false;
+        }
+        Class<?> returnType = method.getReturnType();
+        if (returnType == Void.TYPE || returnType == builderClass) {
+            return false;
+        }
+        if ("build".equals(method.getName())) {
+            return true;
+        }
+        String returnName = returnType.getName();
+        if (returnName.contains("Cronet") && returnName.contains("Context")) {
+            return true;
+        }
+        return isShortObfuscatedName(method.getName())
+                && !returnName.startsWith("java.")
+                && !returnName.startsWith("android.");
+    }
+
+    private static boolean isShortObfuscatedName(String name) {
+        if (name == null || name.length() == 0 || name.length() > 8) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

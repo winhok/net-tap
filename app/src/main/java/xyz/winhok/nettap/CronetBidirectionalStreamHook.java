@@ -10,7 +10,7 @@ import de.robv.android.xposed.XposedBridge;
 
 /**
  * Hook installer for {@code org.chromium.net.impl.CronetBidirectionalStream}
- * (stock and TTNet-shaded). Captures request+response bodies by accumulating
+ * in the canonical Chromium namespace. Captures request+response bodies by accumulating
  * {@code onReadCompleted} / {@code onWriteCompleted} ByteBuffer slices. Used
  * for gRPC-over-Cronet and HTTP/2 streaming when the app bypasses the stock
  * CronetUrlRequest path.

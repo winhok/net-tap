@@ -4,45 +4,6 @@ import java.util.LinkedHashMap;
 
 import de.robv.android.xposed.XC_MethodHook;
 
-
-// okhttp3.internal.http.CallServerInterceptor:
-//
-// /* compiled from: CallServerInterceptor.kt */
-// /* loaded from: classes.dex */
-// public final class CallServerInterceptor implements Interceptor {
-//     private final boolean forWebSocket;
-//     ...
-//     public Response intercept(Interceptor.Chain chain) {
-//         RealInterceptorChain realChain = chain;
-//         Exchange exchange = realChain.exchange;
-//         Request request = realChain.request;
-//         ...
-//         IOException sendRequestException = null;
-//         try {
-//             exchange.writeRequestHeaders(request);  <----
-//             ...
-
-// okhttp3.internal.connection.Exchange:
-//
-// /* compiled from: Exchange.kt */
-// /* loaded from: classes.dex */
-// public final class Exchange {
-//     ...
-//     public final void writeRequestHeaders(Request request) throws IOException {
-//         Intrinsics.checkParameterIsNotNull(request, "request");
-//         try {
-//             this.eventListener.requestHeadersStart(this.call);
-//             this.codec.writeRequestHeaders(request);  <----
-//             this.eventListener.requestHeadersEnd(this.call, request);
-//         } catch (IOException e) {
-//             this.eventListener.requestFailed(this.call, e);
-//             trackFailure(e);
-//             throw e;
-//         }
-//     }
-//     ...
-// }
-
 /* okhttp3.internal.connection.Exchange.writeRequestHeaders(okhttp3.Request r) hook. */
 public class Exchange_writeRequestHeadersHook extends XC_MethodHook {
     private static final String HOOK_NAME = "Exchange.writeRequestHeaders";

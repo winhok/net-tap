@@ -5,9 +5,8 @@ import java.util.List;
 
 /**
  * Resolves all known {@code CronetUrlRequest} class variants reachable from a
- * given {@link ClassLoader}. Some apps repackage Chromium Cronet under their
- * own namespace (e.g. ByteDance TTNet at {@code com.ttnet.org.chromium...});
- * iterating over a small prefix list keeps the hook target-agnostic.
+ * given {@link ClassLoader}. The default resolver intentionally targets only
+ * the canonical Chromium Cronet namespace.
  *
  * <p>{@link #resolveAll} returns every variant found, in {@link #PREFIXES}
  * order, so callers can install hooks against multiple coexisting Cronet
@@ -16,12 +15,10 @@ import java.util.List;
 public final class CronetCandidates {
 
     /**
-     * Known prefixes for repackaged Cronet implementations. Iterated in order;
-     * the first prefix that successfully resolves the suffix on the given
-     * {@link ClassLoader} wins (but ALL successful resolutions are returned to
-     * support coexistence in one app).
+     * Default Cronet prefix list. Keep this vendor-neutral: only the canonical
+     * Chromium namespace is enabled by default.
      */
-    static final String[] PREFIXES = { "", "com.ttnet." };
+    static final String[] PREFIXES = { "" };
 
     /** Suffix shared by all variants. */
     static final String CRONET_URL_REQUEST_SUFFIX = "org.chromium.net.impl.CronetUrlRequest";
@@ -52,9 +49,8 @@ public final class CronetCandidates {
     }
 
     /**
-     * Resolve all classes whose FQN is {@code prefix + suffix} for any known
-     * Cronet shade prefix. Empty list if nothing resolves or classLoader is
-     * null.
+     * Resolve all classes whose FQN is {@code prefix + suffix} for the default
+     * Cronet prefixes. Empty list if nothing resolves or classLoader is null.
      */
     public static List<Class<?>> resolveAllWithSuffix(ClassLoader classLoader, String suffix) {
         List<Class<?>> resolved = new ArrayList<>();

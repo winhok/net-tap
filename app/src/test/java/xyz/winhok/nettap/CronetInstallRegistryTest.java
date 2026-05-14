@@ -28,9 +28,9 @@ public final class CronetInstallRegistryTest {
         ClassLoader loader = new ClassLoader(getClass().getClassLoader()) { };
 
         assertTrue(registry.markInstalled(loader, "org.chromium.net.impl.CronetUrlRequest"));
-        assertTrue(registry.markInstalled(loader, "com.ttnet.org.chromium.net.impl.CronetUrlRequest"));
+        assertTrue(registry.markInstalled(loader, "example.shaded.org.chromium.net.impl.CronetUrlRequest"));
         assertTrue(registry.isInstalled(loader, "org.chromium.net.impl.CronetUrlRequest"));
-        assertTrue(registry.isInstalled(loader, "com.ttnet.org.chromium.net.impl.CronetUrlRequest"));
+        assertTrue(registry.isInstalled(loader, "example.shaded.org.chromium.net.impl.CronetUrlRequest"));
     }
 
     @Test

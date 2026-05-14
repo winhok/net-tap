@@ -90,6 +90,23 @@ public final class CronetKeyLogHookCoverageTest {
     }
 
     @Test
+    public void builderImplBuildHookMatchesObfuscatedZeroArgEngineFactory() throws Exception {
+        assertTrue(hookBuilderImplBuild(ObfuscatedBuilderImplSurface.class, "/tmp/key.log"));
+        assertEquals(1, XposedBridge.hookedMethods().size());
+        assertEquals("LIZ", XposedBridge.hookedMethods().get(0).member.getName());
+
+        ObfuscatedBuilderImplSurface target = new ObfuscatedBuilderImplSurface();
+        target.experimentalOptions = "{\"QUIC\":{}}";
+
+        invokeHook(XposedBridge.hookedMethods().get(0).callback, param(target));
+
+        assertEquals(
+                "{\"ssl_key_log_file\":\"/tmp/key.log\",\"QUIC\":{}}",
+                target.mExperimentalOptions
+        );
+    }
+
+    @Test
     public void builderImplBuildHookToleratesUnsettableOptionsFields() throws Exception {
         assertTrue(hookBuilderImplBuild(UnsettableBuilderImplSurface.class, "/tmp/key.log"));
 
@@ -187,5 +204,21 @@ public final class CronetKeyLogHookCoverageTest {
         public Object build() {
             return new Object();
         }
+    }
+
+    public static final class ObfuscatedBuilderImplSurface {
+        public String mExperimentalOptions;
+        public String experimentalOptions;
+
+        public EngineSurface LIZ() {
+            return new EngineSurface();
+        }
+
+        public ObfuscatedBuilderImplSurface LIZIZ() {
+            return this;
+        }
+    }
+
+    public static final class EngineSurface {
     }
 }

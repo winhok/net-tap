@@ -1,12 +1,14 @@
 package xyz.winhok.nettap;
 
 import java.io.*;
-import java.util.stream.Collectors; 
+import java.util.stream.Collectors;
+import android.util.Log;
 import de.robv.android.xposed.XposedBridge;
 
 
 /* XposedBridge logger with prefix. */
 public class XposedLogger {
+    private static final String LOGCAT_TAG = "NetTap";
     private String prefix;
 
     public XposedLogger(String prefix) {
@@ -23,9 +25,26 @@ public class XposedLogger {
         if (objects.length > 0) {
             message = String.format(message, (Object[]) objects);
         }
-        String prefixedMessage = new BufferedReader(new StringReader(message)).lines()
-            .collect(Collectors.joining("\n"+this.prefix+": ", this.prefix+": ", ""));
-        XposedBridge.log(prefixedMessage);
+        String prefixedMessage = formatPrefixed(this.prefix, message);
+        try {
+            XposedBridge.log(prefixedMessage);
+        } catch (Throwable ignored) {
+        }
+        mirrorToLogcat(prefixedMessage);
+    }
+
+    static String formatPrefixed(String prefix, String message) {
+        return new BufferedReader(new StringReader(message)).lines()
+            .collect(Collectors.joining("\n"+prefix+": ", prefix+": ", ""));
+    }
+
+    private static void mirrorToLogcat(String message) {
+        try {
+            for (String line : message.split("\\r?\\n")) {
+                Log.i(LOGCAT_TAG, line);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     /**

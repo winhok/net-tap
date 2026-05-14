@@ -11,4 +11,10 @@ public class CronetUploadDataStream {
 
     public void onReadSucceeded() {
     }
+
+    public void LIZ() {
+    }
+
+    public void LIZIZ(int ignored) {
+    }
 }

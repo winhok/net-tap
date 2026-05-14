@@ -244,7 +244,7 @@ public final class HookInstallerCoverageTest {
                 java.nio.charset.StandardCharsets.UTF_8));
         CronetUrlRequestHook.attachRequestBodyChunk(request, body, 7, 0, 7);
         assertTrue(CronetUploadDataProviderHook.install("pkg", getClass().getClassLoader()));
-        assertEquals(10, XposedBridge.hookedMethods().size());
+        assertEquals(11, XposedBridge.hookedMethods().size());
         java.nio.ByteBuffer uploadBuffer = java.nio.ByteBuffer.allocate(16);
         uploadBuffer.put("payload".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         org.chromium.net.impl.CronetUploadDataStream stream =
