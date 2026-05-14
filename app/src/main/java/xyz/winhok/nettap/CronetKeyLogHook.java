@@ -26,7 +26,7 @@ public final class CronetKeyLogHook {
     }
 
     public static boolean install(String packageName, ClassLoader classLoader) {
-        if (classLoader == null || !CaptureConfig.ENABLE_CRONET_QUIC_KEYLOG) {
+        if (classLoader == null || !RuntimeCaptureConfig.isCronetQuicKeylogEnabled()) {
             return false;
         }
         try {
@@ -80,6 +80,10 @@ public final class CronetKeyLogHook {
                 XposedBridge.hookMethod(m, new XC_MethodHook() {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) {
+                        RuntimeCaptureConfig.refreshFromXSharedPreferencesIfStale();
+                        if (!RuntimeCaptureConfig.isCronetQuicKeylogEnabled()) {
+                            return;
+                        }
                         if (param.args == null || param.args.length == 0) {
                             return;
                         }
@@ -116,6 +120,10 @@ public final class CronetKeyLogHook {
                 XposedBridge.hookMethod(m, new XC_MethodHook() {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) {
+                        RuntimeCaptureConfig.refreshFromXSharedPreferencesIfStale();
+                        if (!RuntimeCaptureConfig.isCronetQuicKeylogEnabled()) {
+                            return;
+                        }
                         try {
                             String merged = mergeKeyLogPath(
                                     readExperimentalOptions(param.thisObject), path);

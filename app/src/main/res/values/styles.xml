@@ -1,0 +1,9 @@
+<resources>
+    <style name="Widget" />
+
+    <style name="Widget.NetTap" />
+
+    <style name="Widget.NetTap.Row">
+        <item name="android:padding">12dp</item>
+    </style>
+</resources>

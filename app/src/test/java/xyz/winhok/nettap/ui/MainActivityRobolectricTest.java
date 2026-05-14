@@ -1,0 +1,663 @@
+package xyz.winhok.nettap.ui;
+
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.TextView;
+
+import androidx.appcompat.widget.SearchView;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.android.material.tabs.TabLayout;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.Robolectric;
+import org.robolectric.RuntimeEnvironment;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.Shadows;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
+import org.robolectric.shadows.ShadowDialog;
+
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+
+import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.RuntimeCaptureConfig;
+import xyz.winhok.nettap.ui.data.CaptureBodySnapshot;
+import xyz.winhok.nettap.ui.data.CaptureUiEvent;
+import xyz.winhok.nettap.ui.fragment.DetailHostFragment;
+
+import io.github.rosemoe.sora.widget.CodeEditor;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+@RunWith(RobolectricTestRunner.class)
+@Config(sdk = 34)
+@LooperMode(LooperMode.Mode.PAUSED)
+public final class MainActivityRobolectricTest {
+    @Before
+    public void setUp() {
+        RuntimeCaptureConfig.resetForTests();
+        RuntimeEnvironment.getApplication()
+                .getSharedPreferences(UiPreferences.NAME, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit();
+        deleteRecursively(RuntimeEnvironment.getApplication().getExternalFilesDir("export"));
+        resetUiState();
+    }
+
+    @After
+    public void tearDown() {
+        NetTapUiState.stopRealtimeServer();
+        RuntimeEnvironment.getApplication()
+                .getSharedPreferences(UiPreferences.NAME, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit();
+        deleteRecursively(RuntimeEnvironment.getApplication().getExternalFilesDir("export"));
+        resetUiState();
+    }
+
+    @Test
+    public void launchShowsCaptureSearchAndControls() {
+        MainActivity activity = Robolectric.buildActivity(MainActivity.class)
+                .setup()
+                .get();
+
+        assertNotNull(findButtonByText(activity, R.string.nav_menu));
+        assertNotNull(findSearchView(activity));
+        assertEquals(
+                activity.getString(R.string.search_hint),
+                findSearchView(activity).getQueryHint()
+        );
+        assertNotNull(findButtonByText(activity, R.string.action_freeze));
+        assertNotNull(findButtonByText(activity, R.string.action_clear));
+        assertNotNull(findButtonByText(activity, R.string.action_sort));
+    }
+
+    @Test
+    public void drawerHookNavigationShowsSettingsControls() {
+        MainActivity activity = Robolectric.buildActivity(MainActivity.class)
+                .setup()
+                .get();
+
+        Button hooks = findButtonByText(activity, R.string.nav_hooks);
+        hooks.performClick();
+        activity.getSupportFragmentManager().executePendingTransactions();
+
+        assertNotNull(findTextViewByText(activity, R.string.settings_realtime_transport));
+        assertNotNull(findTextViewByText(activity, R.string.settings_builder_hook));
+    }
+
+    @Test
+    public void hookSettingsSaveAppliesSwitchesToRuntimeConfig() {
+        MainActivity activity = launch();
+
+        findButtonByText(activity, R.string.nav_hooks).performClick();
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        findSwitchByText(activity, R.string.settings_realtime_transport).setChecked(false);
+        findSwitchByText(activity, R.string.settings_builder_hook).setChecked(false);
+        findSwitchByText(activity, R.string.settings_tls_keylog).setChecked(false);
+        findSwitchByText(activity, R.string.settings_cronet_keylog).setChecked(false);
+        findButtonByText(activity, R.string.action_save).performClick();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        assertTrue(!RuntimeCaptureConfig.isRealtimeTransportEnabled());
+        assertTrue(!RuntimeCaptureConfig.isBuilderInterceptorHookEnabled());
+        assertTrue(!RuntimeCaptureConfig.isTlsKeylogEnabled());
+        assertTrue(!RuntimeCaptureConfig.isCronetQuicKeylogEnabled());
+    }
+
+    @Test
+    public void drawerTlsNavigationShowsPathDiagnosticsAndDisabledRootActions() {
+        MainActivity activity = launch();
+
+        findButtonByText(activity, R.string.nav_tls_keylog).performClick();
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        assertNotNull(findTextViewContaining(activity, "/data/data/<host-package>/files/_tls_keylog.log"));
+        assertNotNull(findTextViewContaining(activity, activity.getString(R.string.tls_root_helper_note)));
+        assertNotNull(findButtonByText(activity, R.string.tls_copy_path));
+        assertTrue(!findButtonByText(activity, R.string.tls_share_disabled).isEnabled());
+        assertTrue(!findButtonByText(activity, R.string.tls_clear_disabled).isEnabled());
+    }
+
+    @Test
+    public void seededSessionShowsSequenceRowsAndSearchFiltersThem() {
+        NetTapUiState.store().addFromRealtime(event(
+                "request-1",
+                "https://api.example.com/v1/users?active=true",
+                201
+        ));
+        NetTapUiState.store().addFromRealtime(event(
+                "request-2",
+                "https://static.example.com/logo.png",
+                404
+        ));
+        MainActivity activity = launch();
+        RecyclerView list = findRecyclerViewWithAdapter(
+                activity,
+                "CaptureSequenceAdapter"
+        );
+        assertNotNull(list);
+        assertEquals(2, list.getAdapter().getItemCount());
+
+        findSearchView(activity).setQuery("static", true);
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+        list = findRecyclerViewWithAdapter(activity, "CaptureSequenceAdapter");
+
+        assertEquals(1, list.getAdapter().getItemCount());
+    }
+
+    @Test
+    public void exportVisibleWritesOnlyFilteredHarEntries() throws Exception {
+        NetTapUiState.store().addFromRealtime(event(
+                "request-1",
+                "https://api.example.com/v1/users?active=true",
+                201
+        ));
+        NetTapUiState.store().addFromRealtime(event(
+                "request-2",
+                "https://static.example.com/logo.png",
+                404
+        ));
+        MainActivity activity = launch();
+
+        findSearchView(activity).setQuery("static", true);
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+        findButtonByText(activity, R.string.action_export_visible).performClick();
+
+        String har = readNewHar(activity, 0);
+        assertTrue(har.contains("https://static.example.com/logo.png"));
+        assertFalse(har.contains("https://api.example.com/v1/users"));
+    }
+
+    @Test
+    public void exportAllWritesWholeSessionHarEntries() throws Exception {
+        NetTapUiState.store().addFromRealtime(event(
+                "request-1",
+                "https://api.example.com/v1/users?active=true",
+                201
+        ));
+        NetTapUiState.store().addFromRealtime(event(
+                "request-2",
+                "https://static.example.com/logo.png",
+                404
+        ));
+        MainActivity activity = launch();
+
+        findButtonByText(activity, R.string.action_export_all).performClick();
+
+        String har = readNewHar(activity, 0);
+        assertTrue(har.contains("https://api.example.com/v1/users"));
+        assertTrue(har.contains("https://static.example.com/logo.png"));
+    }
+
+    @Test
+    public void detailResponseExportWritesSingleEntryHar() throws Exception {
+        NetTapUiState.store().addFromRealtime(event(
+                "request-1",
+                "https://api.example.com/v1/users?active=true",
+                201
+        ));
+        NetTapUiState.store().addFromRealtime(event(
+                "request-2",
+                "https://static.example.com/logo.png",
+                404
+        ));
+        MainActivity activity = launch();
+
+        activity.showDetail("request-1");
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+        TabLayout tabs = findView(activity.getWindow().getDecorView(), TabLayout.class);
+        assertNotNull(tabs);
+        assertNotNull(tabs.getTabAt(2));
+        tabs.getTabAt(2).select();
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        findButtonByText(activity, R.string.action_export_entry).performClick();
+
+        String har = readNewHar(activity, 0);
+        assertTrue(har.contains("https://api.example.com/v1/users"));
+        assertFalse(har.contains("https://static.example.com/logo.png"));
+    }
+
+    @Test
+    public void freezeAndClearControlsUpdateSessionState() {
+        NetTapUiState.store().addFromRealtime(event(
+                "request-1",
+                "https://api.example.com/v1/users",
+                200
+        ));
+        MainActivity activity = launch();
+
+        Button freeze = findButtonByText(activity, R.string.action_freeze);
+        freeze.performClick();
+        assertEquals(activity.getString(R.string.action_resume), freeze.getText().toString());
+        assertTrue(findTextViewContaining(activity, activity.getString(R.string.session_state_frozen)) != null);
+
+        Button clear = findButtonByText(activity, R.string.action_clear);
+        clear.performClick();
+        androidx.appcompat.app.AlertDialog dialog =
+                (androidx.appcompat.app.AlertDialog) ShadowDialog.getLatestDialog();
+        assertNotNull(dialog);
+        assertNotNull(findTextViewByText(
+                dialog.getWindow().getDecorView(),
+                activity.getString(R.string.clear_confirm_title)
+        ));
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).callOnClick();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        assertTrue(NetTapUiState.store().sequenceOldestFirst().isEmpty());
+        assertTrue(findTextViewContaining(activity, activity.getString(R.string.session_state_cleared)) != null);
+    }
+
+    @Test
+    public void detailNavigationShowsFourTabsAndEventSummary() {
+        NetTapUiState.store().addFromRealtime(event(
+                "request-1",
+                "https://api.example.com/v1/users?active=true",
+                201
+        ));
+        MainActivity activity = launch();
+
+        activity.showDetail("request-1");
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        assertNotNull(findTextViewByText(activity, "General"));
+        assertNotNull(findTextViewByText(activity, "Request"));
+        assertNotNull(findTextViewByText(activity, "Response"));
+        assertNotNull(findTextViewByText(activity, "Cookies"));
+        assertNotNull(findTextViewContaining(activity, "https://api.example.com/v1/users"));
+    }
+
+    @Test
+    public void bodyViewerShowsOmittedAndBinaryStates() {
+        MainActivity activity = launch();
+
+        NetTapUiState.setSelectedBody(CaptureBodySnapshot.omitted(
+                "application/octet-stream",
+                12L,
+                null,
+                "binary body"
+        ));
+        activity.showBodyViewer();
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        assertNotNull(findTextViewContaining(activity, "Omitted: binary body"));
+        assertNotNull(findTextViewContaining(activity, "Language: text"));
+
+        NetTapUiState.setSelectedBody(CaptureBodySnapshot.text(
+                "image/png",
+                8L,
+                null,
+                false,
+                "aGVsbG8="
+        ));
+        activity.showBodyViewer();
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        assertNotNull(findTextViewContaining(activity, "Binary (base64)"));
+        Button decode = findButtonByText(activity, R.string.body_decode_to_file);
+        assertNotNull(decode);
+        assertTrue(!decode.isEnabled());
+    }
+
+    @Test
+    public void bodyViewerOpensFiftyKbJsonInEditor() {
+        MainActivity activity = launch();
+        String body = fiftyKbJson();
+        assertTrue(body.length() > 50 * 1024);
+
+        NetTapUiState.setSelectedBody(CaptureBodySnapshot.text(
+                "application/json",
+                body.length(),
+                null,
+                false,
+                body
+        ));
+        activity.showBodyViewer();
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        CodeEditor editor = findView(activity.getWindow().getDecorView(), CodeEditor.class);
+        assertNotNull(editor);
+        String editorText = editor.getText().toString();
+        assertFalse(editorText.contains(activity.getString(R.string.body_large_placeholder)));
+        assertTrue(editorText.contains("\"items\""));
+        assertTrue(editorText.contains("\"id\": 2499"));
+    }
+
+    @Test
+    public void captureTabsExposeSequenceAndDomains() {
+        MainActivity activity = launch();
+        TabLayout tabs = findView(activity.getWindow().getDecorView(), TabLayout.class);
+
+        assertNotNull(tabs);
+        assertEquals("Sequence", String.valueOf(tabs.getTabAt(0).getText()));
+        assertEquals("Domains", String.valueOf(tabs.getTabAt(1).getText()));
+    }
+
+    @Test
+    public void domainRowClickAppliesHostFilterAndReturnsToSequence() {
+        NetTapUiState.store().addFromRealtime(event(
+                "request-1",
+                "https://api.example.com/v1/users",
+                200
+        ));
+        NetTapUiState.store().addFromRealtime(event(
+                "request-2",
+                "https://static.example.com/logo.png",
+                200
+        ));
+        MainActivity activity = launch();
+        TabLayout tabs = findView(activity.getWindow().getDecorView(), TabLayout.class);
+        assertNotNull(tabs);
+        assertNotNull(tabs.getTabAt(1));
+
+        tabs.getTabAt(1).select();
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        RecyclerView domains = findRecyclerViewWithAdapter(activity, "CaptureDomainsAdapter");
+        assertNotNull(domains);
+        clickAdapterRow(domains, 0);
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+
+        assertEquals("api.example.com", NetTapUiState.getHostFilter());
+        assertEquals(0, tabs.getSelectedTabPosition());
+    }
+
+    private static SearchView findSearchView(MainActivity activity) {
+        return findView(activity.getWindow().getDecorView(), SearchView.class);
+    }
+
+    private static MainActivity launch() {
+        MainActivity activity = Robolectric.buildActivity(MainActivity.class)
+                .setup()
+                .get();
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+        return activity;
+    }
+
+    private static void resetUiState() {
+        NetTapUiState.stopRealtimeServer();
+        NetTapUiState.store().clear();
+        NetTapUiState.setHostFilter(null);
+        NetTapUiState.setHookFilter(null);
+        NetTapUiState.setPackageFilter(null);
+        NetTapUiState.setDetailQuery("");
+        DetailHostFragment.setSelectedEventId(null);
+    }
+
+    private static CaptureUiEvent event(String id, String url, int status) {
+        return CaptureUiEvent.fromJson(sampleJson(url, status)
+                .replace("\"id\":\"request-1\"", "\"id\":\"" + id + "\""));
+    }
+
+    private static String sampleJson(String url, int responseCode) {
+        return "{"
+                + "\"schemaVersion\":2,"
+                + "\"id\":\"request-1\","
+                + "\"timestamp\":\"2026-05-14T00:00:00.000Z\","
+                + "\"packageName\":\"com.example\","
+                + "\"hook\":\"okhttp\","
+                + "\"method\":\"POST\","
+                + "\"url\":\"" + url + "\","
+                + "\"requestHeaders\":{\"Cookie\":\"sid=abc; theme=dark\"},"
+                + "\"requestBody\":{\"contentType\":\"application/json\","
+                + "\"contentLength\":7,"
+                + "\"encoding\":null,"
+                + "\"truncated\":false,"
+                + "\"text\":\"{\\\"a\\\":1}\","
+                + "\"omittedReason\":null},"
+                + "\"responseCode\":" + responseCode + ","
+                + "\"responseMessage\":\"Created\","
+                + "\"responseHeaders\":{\"Content-Type\":\"application/json\","
+                + "\"Set-Cookie\":\"id=1; Secure; HttpOnly; SameSite=Lax\"},"
+                + "\"responseBody\":{\"contentType\":\"application/json\","
+                + "\"contentLength\":11,"
+                + "\"encoding\":null,"
+                + "\"truncated\":false,"
+                + "\"text\":\"{\\\"ok\\\":true}\","
+                + "\"omittedReason\":null},"
+                + "\"durationMs\":25,"
+                + "\"error\":null"
+                + "}";
+    }
+
+    private static String fiftyKbJson() {
+        StringBuilder json = new StringBuilder("{\"items\":[");
+        for (int i = 0; i < 2500; i++) {
+            if (i > 0) {
+                json.append(',');
+            }
+            json.append("{\"id\":").append(i).append(",\"ok\":true}");
+        }
+        json.append("]}");
+        return json.toString();
+    }
+
+    private static Button findButtonByText(MainActivity activity, int textRes) {
+        return findButtonByText(
+                activity.getWindow().getDecorView(),
+                activity.getString(textRes)
+        );
+    }
+
+    private static TextView findTextViewByText(MainActivity activity, int textRes) {
+        return findTextViewByText(
+                activity.getWindow().getDecorView(),
+                activity.getString(textRes)
+        );
+    }
+
+    private static SwitchMaterial findSwitchByText(MainActivity activity, int textRes) {
+        SwitchMaterial match = findSwitchByText(
+                activity.getWindow().getDecorView(),
+                activity.getString(textRes)
+        );
+        assertNotNull(match);
+        return match;
+    }
+
+    private static TextView findTextViewByText(MainActivity activity, String text) {
+        return findTextViewByText(activity.getWindow().getDecorView(), text);
+    }
+
+    private static RecyclerView findRecyclerViewWithAdapter(MainActivity activity, String adapterName) {
+        return findRecyclerViewWithAdapter(
+                activity.getWindow().getDecorView(),
+                adapterName
+        );
+    }
+
+    private static RecyclerView findRecyclerViewWithAdapter(android.view.View root, String adapterName) {
+        if (root instanceof RecyclerView) {
+            RecyclerView recyclerView = (RecyclerView) root;
+            RecyclerView.Adapter<?> adapter = recyclerView.getAdapter();
+            if (adapter != null && adapter.getClass().getSimpleName().contains(adapterName)) {
+                return recyclerView;
+            }
+        }
+        if (!(root instanceof android.view.ViewGroup)) {
+            return null;
+        }
+        android.view.ViewGroup group = (android.view.ViewGroup) root;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            RecyclerView match = findRecyclerViewWithAdapter(group.getChildAt(i), adapterName);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void clickAdapterRow(RecyclerView recyclerView, int position) {
+        RecyclerView.Adapter adapter = recyclerView.getAdapter();
+        assertNotNull(adapter);
+        assertTrue(adapter.getItemCount() > position);
+        FrameLayout parent = new FrameLayout(recyclerView.getContext());
+        RecyclerView.ViewHolder holder = adapter.onCreateViewHolder(
+                parent,
+                adapter.getItemViewType(position)
+        );
+        adapter.onBindViewHolder(holder, position);
+        holder.itemView.performClick();
+    }
+
+    private static String readNewHar(MainActivity activity, int existingCount) throws Exception {
+        File dir = activity.getExternalFilesDir("export");
+        File[] files = waitForHarFiles(dir, existingCount + 1);
+        File newest = files[0];
+        for (File file : files) {
+            if (file.lastModified() > newest.lastModified()) {
+                newest = file;
+            }
+        }
+        return new String(Files.readAllBytes(newest.toPath()), StandardCharsets.UTF_8);
+    }
+
+    private static File[] waitForHarFiles(File dir, int expectedCount) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+        File[] files = harFiles(dir);
+        while (files.length < expectedCount && System.nanoTime() < deadline) {
+            Thread.sleep(10L);
+            Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+            files = harFiles(dir);
+        }
+        assertTrue(files.length >= expectedCount);
+        return files;
+    }
+
+    private static File[] harFiles(File dir) {
+        if (dir == null || !dir.exists()) {
+            return new File[0];
+        }
+        File[] files = dir.listFiles((file, name) -> name.endsWith(".har"));
+        return files == null ? new File[0] : files;
+    }
+
+    private static void deleteRecursively(File file) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteRecursively(child);
+                }
+            }
+        }
+        assertTrue(file.delete());
+    }
+
+    private static Button findButtonByText(android.view.View root, String text) {
+        if (root instanceof Button && text.contentEquals(((Button) root).getText())) {
+            return (Button) root;
+        }
+        if (!(root instanceof android.view.ViewGroup)) {
+            return null;
+        }
+        android.view.ViewGroup group = (android.view.ViewGroup) root;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            Button match = findButtonByText(group.getChildAt(i), text);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private static TextView findTextViewByText(android.view.View root, String text) {
+        if (root instanceof TextView && text.contentEquals(((TextView) root).getText())) {
+            return (TextView) root;
+        }
+        if (!(root instanceof android.view.ViewGroup)) {
+            return null;
+        }
+        android.view.ViewGroup group = (android.view.ViewGroup) root;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            TextView match = findTextViewByText(group.getChildAt(i), text);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private static SwitchMaterial findSwitchByText(android.view.View root, String text) {
+        if (root instanceof SwitchMaterial && text.contentEquals(((SwitchMaterial) root).getText())) {
+            return (SwitchMaterial) root;
+        }
+        if (!(root instanceof android.view.ViewGroup)) {
+            return null;
+        }
+        android.view.ViewGroup group = (android.view.ViewGroup) root;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            SwitchMaterial match = findSwitchByText(group.getChildAt(i), text);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private static TextView findTextViewContaining(MainActivity activity, String text) {
+        return findTextViewContaining(activity.getWindow().getDecorView(), text);
+    }
+
+    private static TextView findTextViewContaining(android.view.View root, String text) {
+        if (root instanceof TextView && ((TextView) root).getText().toString().contains(text)) {
+            return (TextView) root;
+        }
+        if (!(root instanceof android.view.ViewGroup)) {
+            return null;
+        }
+        android.view.ViewGroup group = (android.view.ViewGroup) root;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            TextView match = findTextViewContaining(group.getChildAt(i), text);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private static <T extends android.view.View> T findView(android.view.View root, Class<T> type) {
+        if (type.isInstance(root)) {
+            return type.cast(root);
+        }
+        if (!(root instanceof android.view.ViewGroup)) {
+            return null;
+        }
+        android.view.ViewGroup group = (android.view.ViewGroup) root;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            T match = findView(group.getChildAt(i), type);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+}

@@ -189,6 +189,18 @@ public final class CaptureEvent {
         return id;
     }
 
+    public String getPackageName() {
+        return packageName;
+    }
+
+    public String getHook() {
+        return hook;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
     private static Map<String, String> copyHeaders(LinkedHashMap<String, String> headers) {
         LinkedHashMap<String, String> copy = new LinkedHashMap<>();
         if (headers != null) {

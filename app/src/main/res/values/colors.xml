@@ -1,0 +1,11 @@
+<resources>
+    <color name="nettap_primary">#006B5F</color>
+    <color name="nettap_on_primary">#FFFFFF</color>
+    <color name="nettap_surface">#FAFCFB</color>
+    <color name="nettap_surface_variant">#E7EFEC</color>
+    <color name="nettap_on_surface">#17211F</color>
+    <color name="nettap_error">#BA1A1A</color>
+    <color name="nettap_warning">#8A5A00</color>
+    <color name="nettap_success">#1B6E35</color>
+    <color name="search_highlight_bg">#FFE082</color>
+</resources>

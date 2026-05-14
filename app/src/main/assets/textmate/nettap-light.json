@@ -1,0 +1,37 @@
+{
+  "name": "nettap-light",
+  "type": "light",
+  "colors": {
+    "editor.background": "#FFFFFF",
+    "editor.foreground": "#1F2328",
+    "editorLineNumber.foreground": "#6E7781",
+    "editorCursor.foreground": "#0F5B4A",
+    "editor.selectionBackground": "#B6D7FF"
+  },
+  "tokenColors": [
+    {
+      "scope": "string.quoted.double.json",
+      "settings": {
+        "foreground": "#0A7A3D"
+      }
+    },
+    {
+      "scope": "constant.numeric.json",
+      "settings": {
+        "foreground": "#0550AE"
+      }
+    },
+    {
+      "scope": "constant.language.json",
+      "settings": {
+        "foreground": "#9A6700"
+      }
+    },
+    {
+      "scope": "punctuation.definition.json",
+      "settings": {
+        "foreground": "#57606A"
+      }
+    }
+  ]
+}

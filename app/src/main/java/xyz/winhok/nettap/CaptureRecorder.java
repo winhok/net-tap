@@ -13,6 +13,10 @@ public final class CaptureRecorder {
         if (event == null) {
             return;
         }
+        RuntimeCaptureConfig.refreshFromXSharedPreferencesIfStale();
+        if (!RuntimeCaptureConfig.shouldRecord(event)) {
+            return;
+        }
 
         String json;
         try {
@@ -40,6 +44,12 @@ public final class CaptureRecorder {
             }
         } catch (Throwable e) {
             NetTap.getXposedLogger().logSafe("failed to emit capture event to logcat: %s", e);
+        }
+
+        try {
+            RealtimeSinkClient.sendDefault(json);
+        } catch (Throwable e) {
+            NetTap.getXposedLogger().logSafe("failed to enqueue realtime capture event: %s", e);
         }
     }
 }

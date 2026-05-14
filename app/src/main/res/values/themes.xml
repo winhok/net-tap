@@ -1,0 +1,16 @@
+<resources>
+    <style name="Theme.NetTap" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/nettap_primary</item>
+        <item name="colorOnPrimary">@color/nettap_on_primary</item>
+        <item name="colorSurface">@color/nettap_surface</item>
+        <item name="colorOnSurface">@color/nettap_on_surface</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="Theme.NetTap.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/nettap_primary</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.NetTap</item>
+    </style>
+</resources>

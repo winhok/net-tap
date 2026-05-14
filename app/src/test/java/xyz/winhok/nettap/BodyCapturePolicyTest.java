@@ -80,6 +80,13 @@ public final class BodyCapturePolicyTest {
     }
 
     @Test
+    public void classifyReturnsUnknownForMalformedMediaTypes() {
+        assertEquals(Decision.UNKNOWN, BodyCapturePolicy.classify("application"));
+        assertEquals(Decision.UNKNOWN, BodyCapturePolicy.classify("application/"));
+        assertEquals(Decision.UNKNOWN, BodyCapturePolicy.classify("   application/   "));
+    }
+
+    @Test
     public void classifyIgnoresCaseAndParameters() {
         assertEquals(Decision.BINARY, BodyCapturePolicy.classify("Image/PNG; charset=binary"));
     }
@@ -89,6 +96,14 @@ public final class BodyCapturePolicyTest {
         assertTrue(BodyCapturePolicy.isBinary("image/png"));
         assertFalse(BodyCapturePolicy.isBinary("text/plain"));
         assertFalse(BodyCapturePolicy.isBinary(null));
+    }
+
+    @Test
+    public void formUrlEncodedCheckNormalizesParametersAndRejectsOtherTypes() {
+        assertTrue(BodyCapturePolicy.isFormUrlEncoded(
+                "Application/X-WWW-Form-Urlencoded; charset=utf-8"));
+        assertFalse(BodyCapturePolicy.isFormUrlEncoded(null));
+        assertFalse(BodyCapturePolicy.isFormUrlEncoded("text/plain"));
     }
 
     @Test

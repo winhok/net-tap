@@ -37,7 +37,7 @@ public final class TlsKeyLogHook {
     }
 
     public static boolean install(String packageName, ClassLoader classLoader) {
-        if (classLoader == null || !CaptureConfig.ENABLE_TLS_KEYLOG) {
+        if (classLoader == null || !RuntimeCaptureConfig.isTlsKeylogEnabled()) {
             return false;
         }
         try {
@@ -106,7 +106,7 @@ public final class TlsKeyLogHook {
                             keyLogLineRef.setAccessible(true);
                             Object line = keyLogLineRef.invoke(null, sslRef);
                             if (line instanceof String && !((String) line).isEmpty()) {
-                                writeLine((String) line);
+                                writeTlsLine((String) line);
                             }
                         } catch (Throwable e) {
                             NetTap.getXposedLogger().logSafe(
@@ -208,14 +208,14 @@ public final class TlsKeyLogHook {
         if (keyLogLine != null) {
             Object out = keyLogLine.invoke(nativeSsl);
             if (out instanceof String && !((String) out).isEmpty()) {
-                writeLine((String) out);
+                writeTlsLine((String) out);
                 return;
             }
         }
         byte[] clientRandom = readByteField(nativeSsl, "clientRandom");
         byte[] masterSecret = readByteField(nativeSsl, "masterSecret");
         if (clientRandom != null && masterSecret != null) {
-            writeLine("CLIENT_RANDOM " + hex(clientRandom) + " " + hex(masterSecret));
+            writeTlsLine("CLIENT_RANDOM " + hex(clientRandom) + " " + hex(masterSecret));
         }
         emitIfPresent(nativeSsl, "clientHandshakeTrafficSecret",
                 "CLIENT_HANDSHAKE_TRAFFIC_SECRET", clientRandom);
@@ -238,7 +238,7 @@ public final class TlsKeyLogHook {
         if (secret == null) {
             return;
         }
-        writeLine(nssLabel + " " + hex(clientRandom) + " " + hex(secret));
+        writeTlsLine(nssLabel + " " + hex(clientRandom) + " " + hex(secret));
     }
 
     private static byte[] readByteField(Object target, String name) {
@@ -332,5 +332,13 @@ public final class TlsKeyLogHook {
             }
         }
         KEYLOG.logRawLine(nssLine);
+    }
+
+    private static void writeTlsLine(String nssLine) {
+        RuntimeCaptureConfig.refreshFromXSharedPreferencesIfStale();
+        if (!RuntimeCaptureConfig.isTlsKeylogEnabled()) {
+            return;
+        }
+        writeLine(nssLine);
     }
 }

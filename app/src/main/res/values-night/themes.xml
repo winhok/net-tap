@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.NetTap" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/nettap_primary</item>
+        <item name="colorOnPrimary">@color/nettap_on_primary</item>
+        <item name="colorSurface">@color/nettap_surface</item>
+        <item name="colorOnSurface">@color/nettap_on_surface</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>

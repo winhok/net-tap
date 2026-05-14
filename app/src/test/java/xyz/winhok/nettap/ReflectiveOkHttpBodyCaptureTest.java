@@ -18,6 +18,8 @@ import okhttp3.ResponseBody;
 import okio.BufferedSink;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -110,6 +112,45 @@ public final class ReflectiveOkHttpBodyCaptureTest {
     }
 
     @Test
+    public void requestBodyOmitsUnknownLengthBeforeWriting() {
+        Request request = new Request.Builder()
+                .url("https://example.com/stream")
+                .post(new UnknownLengthRequestBody())
+                .build();
+
+        CaptureBody body = ReflectiveOkHttp.requestBody(request);
+
+        assertTrue(body.toJson().contains(
+                "\"omittedReason\":\"unknown request body length omitted\""));
+    }
+
+    @Test
+    public void requestBodyOmitsOneShotBodyBeforeWriting() {
+        Request request = new Request.Builder()
+                .url("https://example.com/oneshot")
+                .post(new OneShotRequestBody())
+                .build();
+
+        CaptureBody body = ReflectiveOkHttp.requestBody(request);
+
+        assertTrue(body.toJson().contains(
+                "\"omittedReason\":\"one-shot request body omitted\""));
+    }
+
+    @Test
+    public void requestBodyOmitsDuplexBodyBeforeWriting() {
+        Request request = new Request.Builder()
+                .url("https://example.com/duplex")
+                .post(new DuplexRequestBody())
+                .build();
+
+        CaptureBody body = ReflectiveOkHttp.requestBody(request);
+
+        assertTrue(body.toJson().contains(
+                "\"omittedReason\":\"duplex request body omitted\""));
+    }
+
+    @Test
     public void responseBodyGunzipDecodesBeforeSerializing() throws Exception {
         LinkedHashMap<String, String> headers = new LinkedHashMap<>();
         headers.put("Content-Encoding", "gzip");
@@ -171,6 +212,134 @@ public final class ReflectiveOkHttpBodyCaptureTest {
         CaptureBody body = ReflectiveOkHttp.responseBody(response);
 
         assertTrue(body.toJson().contains("\"omittedReason\":\"unknown response body content type omitted\""));
+    }
+
+    @Test
+    public void responseBodyFallsBackToPeekBodyReaderWhenResponseHasNoPeekBodyMethod() {
+        ResponseBody rawBody = ResponseBody.create(
+                "fallback-body".getBytes(StandardCharsets.UTF_8),
+                MediaType.get("text/plain")
+        );
+
+        CaptureBody body = ReflectiveOkHttp.responseBody(new MinimalResponse(rawBody));
+
+        assertTrue(body.toJson().contains("\"text\":\"fallback-body\""));
+        assertTrue(body.toJson().contains("\"contentLength\":13"));
+    }
+
+    @Test
+    public void responseBodyFallbackOmitsWhenOriginalBodyIsMissing() {
+        CaptureBody body = ReflectiveOkHttp.responseBody(new MinimalResponse(null));
+
+        assertTrue(body.toJson().contains("\"omittedReason\":\"response body unavailable\""));
+    }
+
+    @Test
+    public void nullRequestBodyIsOmittedWithoutThrowing() {
+        CaptureBody body = ReflectiveOkHttp.requestBody(null);
+
+        assertTrue(body.toJson().contains("\"omittedReason\":\"request body unavailable\""));
+    }
+
+    @Test
+    public void nullResponseBodyIsOmittedWithoutThrowing() {
+        CaptureBody body = ReflectiveOkHttp.responseBody(null);
+
+        assertTrue(body.toJson().contains("\"omittedReason\":\"response body unavailable\""));
+    }
+
+    @Test
+    public void responseBodyOmitsWhenPeekBodyReturnsNull() {
+        CaptureBody body = ReflectiveOkHttp.responseBody(new NullPeekResponse());
+
+        assertTrue(body.toJson().contains("\"omittedReason\":\"response body unavailable\""));
+    }
+
+    @Test
+    public void responseBodyOmitsWhenPeekedBytesThrow() {
+        CaptureBody body = ReflectiveOkHttp.responseBody(new ThrowingBytesResponse());
+
+        assertTrue(body.toJson().contains("\"omittedReason\":\"response body unavailable\""));
+    }
+
+    @Test
+    public void requestBodyCarriesContentEncodingFromHeadersField() {
+        EncodedFieldRequest request = new EncodedFieldRequest(new ThrowingTextRequestBody());
+
+        CaptureBody body = ReflectiveOkHttp.requestBody(request);
+
+        assertTrue(body.toJson().contains("\"encoding\":\"br\""));
+        assertTrue(body.toJson().contains("\"omittedReason\":\"request body capture failed\""));
+    }
+
+    @Test
+    public void headersFallbackReadsNamesAndValuesFieldAndJoinsDuplicates() {
+        LinkedHashMap<String, String> headers = ReflectiveOkHttp.headers(
+                new NamesAndValuesHeaders(new String[] {
+                        "Set-Cookie", "a=1",
+                        "Set-Cookie", "b=2",
+                        "Empty", null
+                }));
+
+        assertEquals("a=1\nb=2", headers.get("Set-Cookie"));
+        assertNull(headers.get("Empty"));
+    }
+
+    @Test
+    public void headersReadsSizeNameValueApiAndJoinsDuplicates() {
+        LinkedHashMap<String, String> headers = ReflectiveOkHttp.headers(new IndexedHeaders());
+
+        assertEquals("one\ntwo", headers.get("X-Test"));
+        assertFalse(headers.containsKey(null));
+    }
+
+    @Test
+    public void headersFallsBackToOwnerHeadersField() {
+        LinkedHashMap<String, String> headers = ReflectiveOkHttp.headers(
+                new HeadersOwner(new NamesAndValuesHeaders(new String[] {
+                        "X-Owner", "yes"
+                })));
+
+        assertEquals("yes", headers.get("X-Owner"));
+    }
+
+    @Test
+    public void headersReturnsEmptyWhenOwnerHeadersReturnsSelf() {
+        LinkedHashMap<String, String> headers = ReflectiveOkHttp.headers(new SelfHeadersOwner());
+
+        assertTrue(headers.isEmpty());
+    }
+
+    @Test
+    public void requestForResponseFallsBackWhenResponseHasNoRequest() {
+        Object fallback = new Object();
+
+        Object actual = ReflectiveOkHttp.requestForResponse(new Object(), fallback);
+
+        assertSame(fallback, actual);
+    }
+
+    @Test
+    public void requestForResponsePrefersResponseRequestWhenPresent() {
+        Object request = new Object();
+
+        Object actual = ReflectiveOkHttp.requestForResponse(new ResponseWithRequest(request), new Object());
+
+        assertSame(request, actual);
+    }
+
+    @Test
+    public void scalarAccessorsReadFieldsAndDefaults() {
+        FieldBackedExchange exchange = new FieldBackedExchange();
+
+        assertEquals("POST", ReflectiveOkHttp.method(exchange));
+        assertEquals("https://example.com/field", ReflectiveOkHttp.url(exchange));
+        assertEquals(201, ReflectiveOkHttp.responseCode(exchange));
+        assertEquals("Created", ReflectiveOkHttp.responseMessage(exchange));
+        assertEquals("", ReflectiveOkHttp.method(null));
+        assertEquals("", ReflectiveOkHttp.url(null));
+        assertEquals(0, ReflectiveOkHttp.responseCode(new InvalidCodeResponse()));
+        assertEquals("", ReflectiveOkHttp.responseMessage(null));
     }
 
     @Test
@@ -259,6 +428,56 @@ public final class ReflectiveOkHttpBodyCaptureTest {
         }
     }
 
+    private static final class UnknownLengthRequestBody extends RequestBody {
+        public MediaType contentType() {
+            return MediaType.get("text/plain");
+        }
+
+        public long contentLength() {
+            return -1L;
+        }
+
+        public void writeTo(BufferedSink sink) throws IOException {
+            throw new AssertionError("unknown length request body should not be written");
+        }
+    }
+
+    private static final class OneShotRequestBody extends RequestBody {
+        public MediaType contentType() {
+            return MediaType.get("text/plain");
+        }
+
+        public long contentLength() {
+            return 3L;
+        }
+
+        public boolean isOneShot() {
+            return true;
+        }
+
+        public void writeTo(BufferedSink sink) throws IOException {
+            throw new AssertionError("one-shot request body should not be written");
+        }
+    }
+
+    private static final class DuplexRequestBody extends RequestBody {
+        public MediaType contentType() {
+            return MediaType.get("text/plain");
+        }
+
+        public long contentLength() {
+            return 3L;
+        }
+
+        public boolean isDuplex() {
+            return true;
+        }
+
+        public void writeTo(BufferedSink sink) throws IOException {
+            throw new AssertionError("duplex request body should not be written");
+        }
+    }
+
     private static final class ThrowingFormLikeRequestBody extends RequestBody {
         public MediaType contentType() {
             return MediaType.get("application/x-www-form-urlencoded");
@@ -334,6 +553,150 @@ public final class ReflectiveOkHttpBodyCaptureTest {
 
         public int a() {
             return 418;
+        }
+    }
+
+    private static final class MinimalResponse {
+        private final ResponseBody body;
+
+        MinimalResponse(ResponseBody body) {
+            this.body = body;
+        }
+
+        public ResponseBody body() {
+            return body;
+        }
+
+        public NamesAndValuesHeaders headers() {
+            return new NamesAndValuesHeaders(new String[] {
+                    "Content-Encoding", "identity"
+            });
+        }
+    }
+
+    private static final class NullPeekResponse {
+        public ResponseBody body() {
+            return ResponseBody.create("hello".getBytes(StandardCharsets.UTF_8),
+                    MediaType.get("text/plain"));
+        }
+
+        public Object peekBody(long byteCount) {
+            return null;
+        }
+
+        public NamesAndValuesHeaders headers() {
+            return new NamesAndValuesHeaders(new String[] {
+                    "Content-Encoding", "identity"
+            });
+        }
+    }
+
+    private static final class ThrowingBytesResponse {
+        public ThrowingBytesBody body() {
+            return new ThrowingBytesBody();
+        }
+
+        public ThrowingBytesBody peekBody(long byteCount) {
+            return new ThrowingBytesBody();
+        }
+
+        public NamesAndValuesHeaders headers() {
+            return new NamesAndValuesHeaders(new String[] {
+                    "Content-Encoding", "identity"
+            });
+        }
+    }
+
+    private static final class ThrowingBytesBody {
+        public String contentType() {
+            return "text/plain";
+        }
+
+        public long contentLength() {
+            return 5L;
+        }
+
+        public byte[] bytes() {
+            throw new IllegalStateException("simulated bytes failure");
+        }
+    }
+
+    private static final class EncodedFieldRequest {
+        public final NamesAndValuesHeaders headers = new NamesAndValuesHeaders(new String[] {
+                "Content-Encoding", "br"
+        });
+        private final RequestBody body;
+
+        EncodedFieldRequest(RequestBody body) {
+            this.body = body;
+        }
+
+        public RequestBody body() {
+            return body;
+        }
+    }
+
+    private static final class IndexedHeaders {
+        public int size() {
+            return 3;
+        }
+
+        public String name(int index) {
+            return index == 2 ? null : "X-Test";
+        }
+
+        public String value(int index) {
+            return index == 0 ? "one" : "two";
+        }
+    }
+
+    private static final class HeadersOwner {
+        private final Object headers;
+
+        HeadersOwner(Object headers) {
+            this.headers = headers;
+        }
+
+        public Object headers() {
+            return headers;
+        }
+    }
+
+    private static final class SelfHeadersOwner {
+        public Object headers() {
+            return this;
+        }
+    }
+
+    private static final class ResponseWithRequest {
+        private final Object request;
+
+        ResponseWithRequest(Object request) {
+            this.request = request;
+        }
+
+        public Object request() {
+            return request;
+        }
+    }
+
+    private static final class FieldBackedExchange {
+        public String method = "POST";
+        public String url = "https://example.com/field";
+        public String code = "201";
+        public String message = "Created";
+    }
+
+    private static final class InvalidCodeResponse {
+        public String code = "not-a-number";
+    }
+
+    private static final class NamesAndValuesHeaders {
+        @SuppressWarnings("unused")
+        private final String[] namesAndValues;
+
+        NamesAndValuesHeaders(String[] namesAndValues) {
+            this.namesAndValues = namesAndValues;
         }
     }
 }

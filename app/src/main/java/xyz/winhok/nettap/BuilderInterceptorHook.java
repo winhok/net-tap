@@ -9,7 +9,7 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedHelpers;
 
 public final class BuilderInterceptorHook extends XC_MethodHook {
-    private static final String HOOK_NAME = "OkHttpClient.Builder.interceptor";
+    static final String HOOK_NAME = "OkHttpClient.Builder.interceptor";
     private static final String ID_PREFIX = "builder-interceptor";
 
     private final String packageName;

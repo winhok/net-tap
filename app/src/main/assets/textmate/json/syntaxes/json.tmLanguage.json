@@ -1,0 +1,43 @@
+{
+  "name": "JSON",
+  "scopeName": "source.json",
+  "patterns": [
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#constant"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "string": {
+      "name": "string.quoted.double.json",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.json",
+          "match": "\\\\(?:[\"\\\\/bfnrt]|u[0-9a-fA-F]{4})"
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.json",
+      "match": "-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?"
+    },
+    "constant": {
+      "name": "constant.language.json",
+      "match": "\\b(?:true|false|null)\\b"
+    },
+    "punctuation": {
+      "name": "punctuation.definition.json",
+      "match": "[{}\\[\\],:]"
+    }
+  }
+}

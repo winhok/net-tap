@@ -63,6 +63,11 @@ public class NetTap implements IXposedHookLoadPackage {
 
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
         NetTap.getXposedLogger().log("module loaded into: %s", lpparam.packageName);
+        if ("xyz.winhok.nettap".equals(lpparam.packageName)) {
+            NetTap.getXposedLogger().log("skip hooking module UI process");
+            return;
+        }
+        RuntimeCaptureConfig.refreshFromXSharedPreferences();
 
         DiscoveredOkHttp discovered = ShadedOkHttpDiscovery.discover(
                 lpparam.packageName, lpparam.classLoader);
@@ -133,7 +138,7 @@ public class NetTap implements IXposedHookLoadPackage {
             return true;
         }
 
-        if (CaptureConfig.ENABLE_BUILDER_INTERCEPTOR_HOOK
+        if (RuntimeCaptureConfig.isBuilderInterceptorHookEnabled()
                 && installBuilderInterceptorHook(lpparam)) {
             return true;
         }
