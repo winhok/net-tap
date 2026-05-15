@@ -7,22 +7,19 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.view.GravityCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.splashscreen.SplashScreen;
-import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.color.DynamicColors;
 import com.google.android.material.snackbar.Snackbar;
 
@@ -38,23 +35,24 @@ import xyz.winhok.nettap.ui.data.HarExportResult;
 import xyz.winhok.nettap.ui.data.HarExportRequest;
 import xyz.winhok.nettap.ui.data.HarExportWorker;
 import xyz.winhok.nettap.ui.data.RawJsonFileExporter;
-import xyz.winhok.nettap.ui.adapter.DrawerAdapter;
-import xyz.winhok.nettap.ui.fragment.AboutFragment;
 import xyz.winhok.nettap.ui.fragment.BodyViewerFragment;
 import xyz.winhok.nettap.ui.fragment.CaptureDetailFragment;
 import xyz.winhok.nettap.ui.fragment.CaptureListFragment;
+import xyz.winhok.nettap.ui.fragment.ConfigFragment;
 import xyz.winhok.nettap.ui.fragment.DetailHostFragment;
 import xyz.winhok.nettap.ui.fragment.HookSettingsFragment;
-import xyz.winhok.nettap.ui.fragment.TlsKeylogFragment;
-import xyz.winhok.nettap.ui.fragment.UrlFilterFragment;
+import xyz.winhok.nettap.ui.fragment.SettingsFragment;
 
 public final class MainActivity extends AppCompatActivity {
     private static final String TAG = "NetTapMain";
 
     private NavigationController navigationController;
     private UiPreferences preferences;
-    private int containerId;
-    private DrawerLayout drawerLayout;
+    private View mainRoot;
+    private MaterialToolbar toolbar;
+    private BottomNavigationView bottomNavigationView;
+    private int currentTabId = -1;
+    private boolean chromeVisible = true;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService harExportExecutor = Executors.newSingleThreadExecutor();
     private final HarExportWorker harExportWorker = new HarExportWorker(
@@ -71,14 +69,20 @@ public final class MainActivity extends AppCompatActivity {
         preferences = new UiPreferences(this);
         applyThemeMode(preferences.getThemeMode());
         preferences.applyToRuntime();
-        if (preferences.isTransportEnabled()) {
-            NetTapUiState.startRealtimeServer(preferences.getTransportPort());
-        }
-        containerId = View.generateViewId();
-        setContentView(createLayout(containerId));
-        navigationController = new NavigationController(getSupportFragmentManager(), containerId);
+        preferences.applyRealtimeTransport();
+        setContentView(R.layout.activity_main);
+        mainRoot = findViewById(R.id.main_root);
+        toolbar = findViewById(R.id.toolbar);
+        bottomNavigationView = findViewById(R.id.bottom_nav);
+        setSupportActionBar(toolbar);
+        navigationController = new NavigationController(getSupportFragmentManager(), R.id.nav_host);
+        getSupportFragmentManager().addOnBackStackChangedListener(this::syncChromeForCurrentFragment);
+        bottomNavigationView.setOnItemSelectedListener(item -> switchTab(item.getItemId()));
         if (savedInstanceState == null) {
-            navigationController.show("capture", new CaptureListFragment(), false);
+            bottomNavigationView.setSelectedItemId(R.id.tab_captures);
+            if (getSupportFragmentManager().findFragmentById(R.id.nav_host) == null) {
+                switchTab(R.id.tab_captures);
+            }
         }
     }
 
@@ -89,6 +93,10 @@ public final class MainActivity extends AppCompatActivity {
 
     public void showBodyViewer() {
         navigationController.show("body", new BodyViewerFragment(), true);
+    }
+
+    public void showPage(String tag, androidx.fragment.app.Fragment fragment) {
+        navigationController.show(tag, fragment, true);
     }
 
     public void exportHar(List<CaptureUiEvent> events) {
@@ -129,19 +137,19 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showHarExportFailure(HarExportRequest request) {
-        if (drawerLayout == null) {
+        if (mainRoot == null) {
             Toast.makeText(this, R.string.har_export_failed, Toast.LENGTH_SHORT).show();
             return;
         }
-        Snackbar.make(drawerLayout, R.string.har_export_failed, Snackbar.LENGTH_LONG)
+        Snackbar.make(mainRoot, R.string.har_export_failed, Snackbar.LENGTH_LONG)
                 .setAction(R.string.action_retry, view -> exportHar(request))
                 .show();
     }
 
     private void showHarExportResult(HarExportResult result) {
         Snackbar.make(
-                drawerLayout,
-                getString(R.string.har_export_success, result.getEntryCount()),
+                mainRoot,
+                getResources().getQuantityString(R.plurals.har_export_entries, result.getEntryCount(), result.getEntryCount()),
                 Snackbar.LENGTH_LONG
         ).setAction(R.string.action_open, view -> openHar(result)).show();
     }
@@ -194,11 +202,11 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void showSnackbar(int message) {
-        if (drawerLayout == null) {
+        if (mainRoot == null) {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
             return;
         }
-        Snackbar.make(drawerLayout, message, Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(mainRoot, message, Snackbar.LENGTH_SHORT).show();
     }
 
     @Override
@@ -210,86 +218,55 @@ public final class MainActivity extends AppCompatActivity {
         harExportExecutor.shutdownNow();
     }
 
-    private View createLayout(int containerId) {
-        drawerLayout = new DrawerLayout(this);
-        drawerLayout.setId(R.id.drawer_layout);
-        drawerLayout.setBackgroundColor(getColor(R.color.nettap_surface));
-
-        LinearLayout contentRoot = new LinearLayout(this);
-        contentRoot.setOrientation(LinearLayout.VERTICAL);
-        Button menuButton = new Button(this);
-        menuButton.setText(R.string.nav_menu);
-        menuButton.setAllCaps(false);
-        menuButton.setOnClickListener(view -> drawerLayout.openDrawer(GravityCompat.START));
-        contentRoot.addView(menuButton, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-        FrameLayout content = new FrameLayout(this);
-        content.setId(containerId);
-        contentRoot.addView(content, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-        ));
-        drawerLayout.addView(contentRoot, new DrawerLayout.LayoutParams(
-                DrawerLayout.LayoutParams.MATCH_PARENT,
-                DrawerLayout.LayoutParams.MATCH_PARENT
-        ));
-
-        LinearLayout nav = new LinearLayout(this);
-        nav.setOrientation(LinearLayout.VERTICAL);
-        nav.setGravity(Gravity.TOP);
-        nav.setPadding(12, 18, 12, 12);
-        DrawerLayout.LayoutParams navParams = new DrawerLayout.LayoutParams(
-                dp(280),
-                DrawerLayout.LayoutParams.MATCH_PARENT
-        );
-        navParams.gravity = GravityCompat.START;
-        drawerLayout.addView(nav, navParams);
-
-        TextView title = new TextView(this);
-        title.setText(R.string.app_name);
-        title.setTextSize(20);
-        title.setTextColor(getColor(R.color.nettap_on_surface));
-        nav.addView(title, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-
-        DrawerAdapter drawerAdapter = new DrawerAdapter();
-        if (drawerAdapter.size() != 5) {
-            throw new IllegalStateException("unexpected drawer item count");
+    private boolean switchTab(int id) {
+        if (id == currentTabId && getSupportFragmentManager().getBackStackEntryCount() == 0) {
+            return true;
         }
-        addNavButton(nav, R.string.nav_capture, () -> navigationController.show("capture", new CaptureListFragment(), false));
-        addNavButton(nav, R.string.nav_hooks, () -> navigationController.show("hooks", new HookSettingsFragment(), false));
-        addNavButton(nav, R.string.nav_url_filter, () -> navigationController.show("url-filter", new UrlFilterFragment(), false));
-        addNavButton(nav, R.string.nav_tls_keylog, () -> navigationController.show("tls", new TlsKeylogFragment(), false));
-        addNavButton(nav, R.string.nav_about, () -> navigationController.show("about", new AboutFragment(), false));
-        return drawerLayout;
+        currentTabId = id;
+        setMainChromeVisible(true);
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        if (id == R.id.tab_captures) {
+            setTitle(R.string.nav_capture);
+            navigationController.show("capture", new CaptureListFragment(), false);
+            return true;
+        } else if (id == R.id.tab_hooks) {
+            setTitle(R.string.nav_hooks);
+            navigationController.show("hooks", new HookSettingsFragment(), false);
+            return true;
+        } else if (id == R.id.tab_config) {
+            setTitle(R.string.nav_config);
+            navigationController.show("config", new ConfigFragment(), false);
+            return true;
+        } else if (id == R.id.tab_settings) {
+            setTitle(R.string.nav_settings);
+            navigationController.show("settings", new SettingsFragment(), false);
+            return true;
+        }
+        return false;
     }
 
-    private void addNavButton(LinearLayout nav, int label, Runnable action) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setAllCaps(false);
-        button.setOnClickListener(view -> {
-            action.run();
-            if (drawerLayout != null) {
-                drawerLayout.closeDrawer(GravityCompat.START);
-            }
-        });
-        nav.addView(button, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
+    private void syncChromeForCurrentFragment() {
+        Fragment current = getSupportFragmentManager().findFragmentById(R.id.nav_host);
+        boolean immersive = current instanceof CaptureDetailFragment || current instanceof BodyViewerFragment;
+        setMainChromeVisible(!immersive);
     }
 
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    private void setMainChromeVisible(boolean visible) {
+        if (visible == chromeVisible) {
+            return;
+        }
+        chromeVisible = visible;
+        int visibility = visible ? View.VISIBLE : View.GONE;
+        if (toolbar != null) {
+            toolbar.setVisibility(visibility);
+        }
+        if (bottomNavigationView != null) {
+            bottomNavigationView.setVisibility(visibility);
+        }
     }
 
-    static void applyThemeMode(String themeMode) {
+    public static void applyThemeMode(String themeMode) {
         if (UiPreferences.THEME_LIGHT.equals(themeMode)) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
             return;

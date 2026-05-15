@@ -7,6 +7,8 @@ import android.widget.TextView;
 import androidx.appcompat.widget.SearchView;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.tabs.TabLayout;
 
@@ -31,6 +33,7 @@ import xyz.winhok.nettap.RuntimeCaptureConfig;
 import xyz.winhok.nettap.ui.data.CaptureBodySnapshot;
 import xyz.winhok.nettap.ui.data.CaptureUiEvent;
 import xyz.winhok.nettap.ui.fragment.DetailHostFragment;
+import xyz.winhok.nettap.ui.fragment.TlsKeylogFragment;
 
 import io.github.rosemoe.sora.widget.CodeEditor;
 
@@ -69,30 +72,30 @@ public final class MainActivityRobolectricTest {
 
     @Test
     public void launchShowsCaptureSearchAndControls() {
-        MainActivity activity = Robolectric.buildActivity(MainActivity.class)
-                .setup()
-                .get();
+        MainActivity activity = launch();
 
-        assertNotNull(findButtonByText(activity, R.string.nav_menu));
+
+
+
+
+        assertNotNull(activity.findViewById(R.id.bottom_nav));
         assertNotNull(findSearchView(activity));
         assertEquals(
                 activity.getString(R.string.search_hint),
                 findSearchView(activity).getQueryHint()
         );
         assertNotNull(findButtonByText(activity, R.string.action_freeze));
-        assertNotNull(findButtonByText(activity, R.string.action_clear));
-        assertNotNull(findButtonByText(activity, R.string.action_sort));
+        assertTrue(toolbarHasAction(activity, R.id.action_clear));
+        assertTrue(toolbarHasAction(activity, R.id.action_sort));
     }
 
     @Test
-    public void drawerHookNavigationShowsSettingsControls() {
+    public void bottomNavHookNavigationShowsSettingsControls() {
         MainActivity activity = Robolectric.buildActivity(MainActivity.class)
                 .setup()
                 .get();
 
-        Button hooks = findButtonByText(activity, R.string.nav_hooks);
-        hooks.performClick();
-        activity.getSupportFragmentManager().executePendingTransactions();
+        selectBottomTab(activity, R.id.tab_hooks);
 
         assertNotNull(findTextViewByText(activity, R.string.settings_realtime_transport));
         assertNotNull(findTextViewByText(activity, R.string.settings_builder_hook));
@@ -102,9 +105,7 @@ public final class MainActivityRobolectricTest {
     public void hookSettingsSaveAppliesSwitchesToRuntimeConfig() {
         MainActivity activity = launch();
 
-        findButtonByText(activity, R.string.nav_hooks).performClick();
-        activity.getSupportFragmentManager().executePendingTransactions();
-        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+        selectBottomTab(activity, R.id.tab_hooks);
 
         findSwitchByText(activity, R.string.settings_realtime_transport).setChecked(false);
         findSwitchByText(activity, R.string.settings_builder_hook).setChecked(false);
@@ -120,10 +121,10 @@ public final class MainActivityRobolectricTest {
     }
 
     @Test
-    public void drawerTlsNavigationShowsPathDiagnosticsAndDisabledRootActions() {
+    public void configTlsNavigationShowsPathDiagnosticsAndDisabledRootActions() {
         MainActivity activity = launch();
 
-        findButtonByText(activity, R.string.nav_tls_keylog).performClick();
+        activity.showPage("tls", new TlsKeylogFragment());
         activity.getSupportFragmentManager().executePendingTransactions();
         Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
 
@@ -177,7 +178,7 @@ public final class MainActivityRobolectricTest {
 
         findSearchView(activity).setQuery("static", true);
         Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
-        findButtonByText(activity, R.string.action_export_visible).performClick();
+        performToolbarAction(activity, R.id.action_export_visible);
 
         String har = readNewHar(activity, 0);
         assertTrue(har.contains("https://static.example.com/logo.png"));
@@ -198,7 +199,7 @@ public final class MainActivityRobolectricTest {
         ));
         MainActivity activity = launch();
 
-        findButtonByText(activity, R.string.action_export_all).performClick();
+        performToolbarAction(activity, R.id.action_export_all);
 
         String har = readNewHar(activity, 0);
         assertTrue(har.contains("https://api.example.com/v1/users"));
@@ -229,7 +230,7 @@ public final class MainActivityRobolectricTest {
         activity.getSupportFragmentManager().executePendingTransactions();
         Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
 
-        findButtonByText(activity, R.string.action_export_entry).performClick();
+        performToolbarAction(activity, R.id.action_export_entry);
 
         String har = readNewHar(activity, 0);
         assertTrue(har.contains("https://api.example.com/v1/users"));
@@ -250,8 +251,7 @@ public final class MainActivityRobolectricTest {
         assertEquals(activity.getString(R.string.action_resume), freeze.getText().toString());
         assertTrue(findTextViewContaining(activity, activity.getString(R.string.session_state_frozen)) != null);
 
-        Button clear = findButtonByText(activity, R.string.action_clear);
-        clear.performClick();
+        performToolbarAction(activity, R.id.action_clear);
         androidx.appcompat.app.AlertDialog dialog =
                 (androidx.appcompat.app.AlertDialog) ShadowDialog.getLatestDialog();
         assertNotNull(dialog);
@@ -386,7 +386,56 @@ public final class MainActivityRobolectricTest {
     }
 
     private static SearchView findSearchView(MainActivity activity) {
-        return findView(activity.getWindow().getDecorView(), SearchView.class);
+        SearchView sv = findView(activity.getWindow().getDecorView(), SearchView.class);
+        if (sv != null) return sv;
+        MaterialToolbar toolbar = activity.findViewById(R.id.toolbar);
+        if (toolbar != null && toolbar.getMenu() != null) {
+            android.view.MenuItem item = toolbar.getMenu().findItem(R.id.action_search);
+            if (item != null && item.getActionView() instanceof SearchView) {
+                return (SearchView) item.getActionView();
+            }
+        }
+        return null;
+    }
+
+    private static void selectBottomTab(MainActivity activity, int itemId) {
+        BottomNavigationView bottomNavigationView = activity.findViewById(R.id.bottom_nav);
+        assertNotNull(bottomNavigationView);
+        bottomNavigationView.setSelectedItemId(itemId);
+        activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+    }
+
+    private static boolean toolbarHasAction(MainActivity activity, int itemId) {
+        MaterialToolbar toolbar = toolbarWithMenuItem(activity.getWindow().getDecorView(), itemId);
+        return toolbar != null;
+    }
+
+    private static void performToolbarAction(MainActivity activity, int itemId) {
+        MaterialToolbar toolbar = toolbarWithMenuItem(activity.getWindow().getDecorView(), itemId);
+        assertNotNull(toolbar);
+        assertTrue(toolbar.getMenu().performIdentifierAction(itemId, 0));
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+    }
+
+    private static MaterialToolbar toolbarWithMenuItem(android.view.View root, int itemId) {
+        if (root instanceof MaterialToolbar) {
+            MaterialToolbar toolbar = (MaterialToolbar) root;
+            if (toolbar.getMenu().findItem(itemId) != null) {
+                return toolbar;
+            }
+        }
+        if (!(root instanceof android.view.ViewGroup)) {
+            return null;
+        }
+        android.view.ViewGroup group = (android.view.ViewGroup) root;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            MaterialToolbar match = toolbarWithMenuItem(group.getChildAt(i), itemId);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
     }
 
     private static MainActivity launch() {
@@ -394,6 +443,8 @@ public final class MainActivityRobolectricTest {
                 .setup()
                 .get();
         activity.getSupportFragmentManager().executePendingTransactions();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+        activity.invalidateOptionsMenu();
         Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
         return activity;
     }

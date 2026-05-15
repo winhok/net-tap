@@ -3,6 +3,7 @@ package xyz.winhok.nettap.ui.data;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -18,7 +19,7 @@ public final class HarExporterTest {
                 null
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"version\":\"1.2\""));
         assertTrue(har.contains("\"method\":\"POST\""));
@@ -41,7 +42,7 @@ public final class HarExporterTest {
                 "\"Set-Cookie\":\"id=1; Secure; HttpOnly; SameSite=Lax\",\"Location\":\"https://api.example.com/home\""
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"redirectURL\":\"https://api.example.com/home\""));
     }
@@ -54,7 +55,7 @@ public final class HarExporterTest {
                 null
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"name\":\"q\""));
         assertTrue(har.contains("\"value\":\"hello world\""));
@@ -76,7 +77,7 @@ public final class HarExporterTest {
                 "\"responseBody\":{\"contentType\":\"application/json\",\"contentLength\":11,\"encoding\":null,\"truncated\":true,"
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"requestTruncated\":true"));
         assertTrue(har.contains("\"responseTruncated\":true"));
@@ -90,7 +91,7 @@ public final class HarExporterTest {
                 null
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"timings\":{\"send\":0,\"wait\":25,\"receive\":0,\"_nettap\":{\"note\":\"aggregate\"}}"));
     }
@@ -118,7 +119,7 @@ public final class HarExporterTest {
                 null
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"request\":{\"method\":\"POST\""));
         assertTrue(har.contains("\"headersSize\":-1,\"bodySize\":-1,\"postData\""));
@@ -143,7 +144,7 @@ public final class HarExporterTest {
                 "\"responseBody\":{\"contentType\":null"
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"postData\":{\"mimeType\":\"application/json\""));
         assertTrue(har.contains("\"content\":{\"size\":11,\"mimeType\":\"application/json\""));
@@ -156,9 +157,6 @@ public final class HarExporterTest {
                 200,
                 null
         ).replace(
-                "\"requestHeaders\":{\"Cookie\":\"sid=abc; theme=dark\"}",
-                "\"requestHeaders\":{\"Cookie\":\"sid=abc; theme=dark\"}"
-        ).replace(
                 "\"responseHeaders\":{\"Content-Type\":\"application/json\",",
                 "\"responseHeaders\":{"
         ).replace(
@@ -169,7 +167,7 @@ public final class HarExporterTest {
                 "\"responseBody\":{\"contentType\":null"
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"postData\":{\"mimeType\":\"\""));
         assertTrue(har.contains("\"content\":{\"size\":11,\"mimeType\":\"\""));
@@ -186,7 +184,7 @@ public final class HarExporterTest {
                 "\"responseBody\":{\"contentType\":\"application/json\",\"contentLength\":-1,"
         ));
 
-        String har = compact(HarExporter.export(Arrays.asList(event), false));
+        String har = compact(HarExporter.export(Collections.singletonList(event), false));
 
         assertTrue(har.contains("\"content\":{\"size\":-1,\"mimeType\":\"application/json\""));
     }
@@ -199,7 +197,7 @@ public final class HarExporterTest {
                 null
         ));
 
-        String har = HarExporter.export(Arrays.asList(event), false);
+        String har = HarExporter.export(Collections.singletonList(event), false);
 
         assertTrue(har.startsWith("{\n  \"log\": {\n    \"version\": \"1.2\""));
     }

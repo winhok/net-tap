@@ -2,8 +2,6 @@ package xyz.winhok.nettap.ui;
 
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -50,15 +48,14 @@ public final class MainActivitySmokeTest {
     }
 
     @Test
-    public void launchesCaptureScreenAndNavigatesDrawerItems() {
-        onView(withText(R.string.nav_menu)).check(matches(isDisplayed()));
+    public void launchesCaptureScreenAndNavigatesBottomNavItems() {
         onView(withHint(R.string.search_hint)).check(matches(isDisplayed()));
 
         activityRule.getScenario().onActivity(activity -> {
-            DrawerLayout drawerLayout = activity.findViewById(R.id.drawer_layout);
-            drawerLayout.openDrawer(GravityCompat.START, false);
+            com.google.android.material.bottomnavigation.BottomNavigationView bottomNav =
+                    activity.findViewById(R.id.bottom_nav);
+            bottomNav.setSelectedItemId(R.id.tab_hooks);
         });
-        onView(withText(R.string.nav_hooks)).perform(click());
         onView(withText(R.string.settings_realtime_transport)).check(matches(isDisplayed()));
     }
 

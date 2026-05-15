@@ -7,9 +7,9 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -19,18 +19,24 @@ import androidx.fragment.app.Fragment;
 
 import xyz.winhok.nettap.R;
 import xyz.winhok.nettap.RuntimeCaptureConfig;
+import xyz.winhok.nettap.ui.Dimens;
+import xyz.winhok.nettap.ui.SectionViews;
 import xyz.winhok.nettap.ui.UiPreferences;
 import xyz.winhok.nettap.ui.data.TlsKeylogPath;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
 public final class TlsKeylogFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        ScrollView scrollView = new ScrollView(requireContext());
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(18, 18, 18, 18);
+        Dimens.setPaddingDp(root, 12, 12);
+        scrollView.addView(root);
+        LinearLayout section = SectionViews.addSection(inflater, root);
         UiPreferences prefs = new UiPreferences(requireContext());
         SwitchMaterial tlsSwitch = new SwitchMaterial(requireContext());
         tlsSwitch.setText(R.string.settings_tls_keylog);
@@ -48,17 +54,21 @@ public final class TlsKeylogFragment extends Fragment {
         hostPackage.setSingleLine(true);
         hostPackage.setHint(R.string.tls_host_package_hint);
         TextView text = new TextView(requireContext());
-        text.setText(getString(R.string.tls_status_prefix) + "\n" + TlsKeylogPath.template()
-                + "\n\n" + getString(
+        text.setText(getString(
+                R.string.tls_status_body,
+                getString(R.string.tls_status_prefix),
+                TlsKeylogPath.template(),
+                getString(
                         R.string.tls_hook_status,
                         String.valueOf(RuntimeCaptureConfig.isTlsKeylogEnabled())
-                )
-                + "\n" + getString(
+                ),
+                getString(
                         R.string.tls_cronet_status,
                         String.valueOf(RuntimeCaptureConfig.isCronetQuicKeylogEnabled())
-                )
-                + "\n\n" + getString(R.string.tls_root_helper_note));
-        Button copyPath = new Button(requireContext());
+                ),
+                getString(R.string.tls_root_helper_note)
+        ));
+        MaterialButton copyPath = new MaterialButton(requireContext());
         copyPath.setText(R.string.tls_copy_path);
         copyPath.setAllCaps(false);
         copyPath.setOnClickListener(view -> {
@@ -73,18 +83,18 @@ public final class TlsKeylogFragment extends Fragment {
                 Toast.makeText(requireContext(), R.string.clipboard_copied, Toast.LENGTH_SHORT).show();
             }
         });
-        root.addView(tlsSwitch);
-        root.addView(hostPackage);
-        root.addView(text);
-        root.addView(copyPath);
-        Button share = new Button(requireContext());
+        section.addView(tlsSwitch);
+        section.addView(hostPackage);
+        section.addView(text);
+        section.addView(copyPath);
+        MaterialButton share = new MaterialButton(requireContext());
         share.setText(R.string.tls_share_disabled);
         share.setEnabled(false);
-        Button clear = new Button(requireContext());
+        MaterialButton clear = new MaterialButton(requireContext());
         clear.setText(R.string.tls_clear_disabled);
         clear.setEnabled(false);
-        root.addView(share);
-        root.addView(clear);
-        return root;
+        section.addView(share);
+        section.addView(clear);
+        return scrollView;
     }
 }

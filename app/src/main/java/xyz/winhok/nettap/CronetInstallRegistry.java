@@ -19,7 +19,7 @@ final class CronetInstallRegistry {
     }
 
     private final Map<ClassLoader, Set<String>> installedLoaders = Collections.synchronizedMap(
-            new WeakHashMap<ClassLoader, Set<String>>()
+            new WeakHashMap<>()
     );
 
     /**
@@ -93,7 +93,7 @@ final class CronetInstallRegistry {
     }
 
     boolean markInstalled(ClassLoader classLoader, String className) {
-        if (classLoader == null || className == null || className.length() == 0) {
+        if (classLoader == null || className == null || className.isEmpty()) {
             return false;
         }
         synchronized (installedLoaders) {

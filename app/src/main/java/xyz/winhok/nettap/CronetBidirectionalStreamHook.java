@@ -188,7 +188,7 @@ public final class CronetBidirectionalStreamHook {
                     hookName,
                     null,
                     state.url,
-                    new LinkedHashMap<String, String>(),
+                    new LinkedHashMap<>(),
                     bodyFrom(state.requestBody, "cronet bidi request body not observed"),
                     state.responseCode,
                     null,

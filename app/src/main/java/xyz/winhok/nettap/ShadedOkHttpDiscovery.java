@@ -34,9 +34,8 @@ public final class ShadedOkHttpDiscovery {
             return cached;
         }
         if (classLoader == null) {
-            DiscoveredOkHttp empty = new DiscoveredOkHttp(
+            return new DiscoveredOkHttp(
                     null, null, null, null, null, null, null, null, null, false);
-            return empty;
         }
 
         DiscoveredOkHttp result = tryStock(classLoader);

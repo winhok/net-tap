@@ -172,7 +172,7 @@ public final class MethodScopeStateTest {
     @Test
     public void constructorRejectsNullKey() {
         try {
-            new MethodScopeState<State>(null, () -> new State(0));
+            new MethodScopeState<>(null, () -> new State(0));
             fail("expected IllegalArgumentException for null key");
         } catch (IllegalArgumentException expected) {
         }
@@ -181,7 +181,7 @@ public final class MethodScopeStateTest {
     @Test
     public void constructorRejectsEmptyKey() {
         try {
-            new MethodScopeState<State>("", () -> new State(0));
+            new MethodScopeState<>("", () -> new State(0));
             fail("expected IllegalArgumentException for empty key");
         } catch (IllegalArgumentException expected) {
         }

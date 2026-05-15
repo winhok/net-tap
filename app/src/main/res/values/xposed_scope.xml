@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string-array name="xposed_scope">
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string-array
+        name="xposed_scope"
+        tools:ignore="UnusedResources">
         <item>*</item>
     </string-array>
 </resources>

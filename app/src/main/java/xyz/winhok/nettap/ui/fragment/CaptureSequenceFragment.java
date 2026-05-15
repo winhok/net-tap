@@ -10,8 +10,8 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,6 +27,7 @@ import java.util.List;
 import xyz.winhok.nettap.R;
 import xyz.winhok.nettap.ui.CaptureFilterSummaryFormatter;
 import xyz.winhok.nettap.ui.CaptureSessionSummaryFormatter;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.MainActivity;
 import xyz.winhok.nettap.ui.NetTapUiState;
 import xyz.winhok.nettap.ui.SequenceEmptyState;
@@ -35,6 +36,8 @@ import xyz.winhok.nettap.ui.data.CaptureUiEvent;
 import xyz.winhok.nettap.ui.widget.FadeSpinnerView;
 import xyz.winhok.nettap.ui.widget.SpacedRecyclerView;
 
+import com.google.android.material.button.MaterialButton;
+
 public final class CaptureSequenceFragment extends Fragment implements CapturePage {
     private static final int MENU_FILTER_HOOK = 1;
     private static final int MENU_FILTER_PACKAGE = 2;
@@ -42,7 +45,7 @@ public final class CaptureSequenceFragment extends Fragment implements CapturePa
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView summary;
-    private Button clearFilters;
+    private MaterialButton clearFilters;
     private SpacedRecyclerView list;
     private LinearLayout emptyState;
     private FadeSpinnerView emptySpinner;
@@ -66,10 +69,11 @@ public final class CaptureSequenceFragment extends Fragment implements CapturePa
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
         summary = new TextView(requireContext());
-        summary.setTextSize(18);
+        summary.setTextSize(13);
+        Dimens.setPaddingDp(summary, 12, 8);
         root.addView(summary);
 
-        clearFilters = new Button(requireContext());
+        clearFilters = new MaterialButton(requireContext());
         clearFilters.setText(R.string.action_clear_filters);
         clearFilters.setAllCaps(false);
         clearFilters.setVisibility(View.GONE);
@@ -116,8 +120,14 @@ public final class CaptureSequenceFragment extends Fragment implements CapturePa
         emptyState.setGravity(Gravity.CENTER);
         emptyState.setOrientation(LinearLayout.VERTICAL);
         emptyState.setVisibility(View.GONE);
+        ImageView icon = new ImageView(requireContext());
+        icon.setImageResource(R.drawable.ic_empty_box);
+        emptyState.addView(icon, new LinearLayout.LayoutParams(
+                Dimens.dp(requireContext(), 64),
+                Dimens.dp(requireContext(), 64)
+        ));
         emptySpinner = new FadeSpinnerView(requireContext());
-        int spinnerSize = Math.round(getResources().getDisplayMetrics().density * 48f);
+        int spinnerSize = Dimens.dp(requireContext(), 48);
         emptyState.addView(emptySpinner, new LinearLayout.LayoutParams(spinnerSize, spinnerSize));
         emptyText = new TextView(requireContext());
         emptyText.setGravity(Gravity.CENTER);

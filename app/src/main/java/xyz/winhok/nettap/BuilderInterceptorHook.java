@@ -3,7 +3,6 @@ package xyz.winhok.nettap;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.LinkedHashMap;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedHelpers;
@@ -56,10 +55,10 @@ public final class BuilderInterceptorHook extends XC_MethodHook {
                 return "NetTapInterceptor@" + System.identityHashCode(proxy);
             }
             if ("hashCode".equals(name)) {
-                return Integer.valueOf(System.identityHashCode(proxy));
+                return System.identityHashCode(proxy);
             }
             if ("equals".equals(name)) {
-                return Boolean.valueOf(args != null && args.length > 0 && args[0] == proxy);
+                return args != null && args.length > 0 && args[0] == proxy;
             }
             if (!"intercept".equals(name)) {
                 return null;

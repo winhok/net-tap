@@ -1,7 +1,10 @@
 package xyz.winhok.nettap.ui.data;
 
+import android.annotation.SuppressLint;
+
 import xyz.winhok.nettap.CaptureConfig;
 
+@SuppressLint("SdCardPath")
 public final class TlsKeylogPath {
     private static final String PLACEHOLDER = "<host-package>";
 

@@ -2,6 +2,7 @@ package xyz.winhok.nettap.ui.data;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +36,7 @@ public final class QueryParamParser {
 
     private static String decode(String value) {
         try {
-            return URLDecoder.decode(value, "UTF-8");
+            return URLDecoder.decode(value, StandardCharsets.UTF_8.name());
         } catch (IllegalArgumentException | UnsupportedEncodingException e) {
             return value;
         }

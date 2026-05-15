@@ -3,6 +3,7 @@ package xyz.winhok.nettap.ui.data;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -38,8 +39,8 @@ public final class SearchEngineTest {
                 null
         ));
 
-        assertEquals(1, SearchEngine.filter(Arrays.asList(event), "theme dark").size());
-        assertEquals(1, SearchEngine.filter(Arrays.asList(event), "ok true").size());
+        assertEquals(1, SearchEngine.filter(Collections.singletonList(event), "theme dark").size());
+        assertEquals(1, SearchEngine.filter(Collections.singletonList(event), "ok true").size());
     }
 
     @Test

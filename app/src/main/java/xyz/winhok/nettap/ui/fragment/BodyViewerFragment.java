@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment;
 import java.util.Locale;
 
 import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.NetTapUiState;
 import xyz.winhok.nettap.ui.SoraTextMateInstaller;
 import xyz.winhok.nettap.ui.data.BodyDisplayState;
@@ -33,7 +34,7 @@ public final class BodyViewerFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(18, 18, 18, 18);
+        Dimens.setPaddingDp(root, 12, 12);
         BodyDisplayState state = NetTapUiState.getSelectedBody();
 
         MaterialCardView topBar = new MaterialCardView(requireContext());
@@ -46,7 +47,7 @@ public final class BodyViewerFragment extends Fragment {
         topBarContent.addView(close);
         TextView language = new TextView(requireContext());
         language.setText(getString(R.string.body_language_format, state.getLanguage()));
-        language.setPadding(18, 0, 0, 0);
+        language.setPadding(Dimens.dp(requireContext(), 12), 0, 0, 0);
         topBarContent.addView(language);
         topBar.addView(topBarContent);
         root.addView(topBar);
@@ -55,7 +56,7 @@ public final class BodyViewerFragment extends Fragment {
         statusCard.setVisibility("OK".equals(state.getStatus()) ? View.GONE : View.VISIBLE);
         TextView status = new TextView(requireContext());
         status.setText(state.getStatus());
-        status.setPadding(12, 10, 12, 10);
+        Dimens.setPaddingDp(status, 12, 10);
         statusCard.addView(status);
         root.addView(statusCard);
         if (state.isBinaryBase64()) {

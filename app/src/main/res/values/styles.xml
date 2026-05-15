@@ -1,9 +1,24 @@
 <resources>
-    <style name="Widget" />
+    <style name="Widget.NetTap.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:minHeight">@dimen/toolbar_height</item>
+        <item name="titleCentered">true</item>
+        <item name="titleTextAppearance">@style/TextAppearance.NetTap.Toolbar</item>
+    </style>
 
-    <style name="Widget.NetTap" />
+    <style name="TextAppearance.NetTap.Toolbar" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textSize">@dimen/text_appbar</item>
+    </style>
 
-    <style name="Widget.NetTap.Row">
-        <item name="android:padding">12dp</item>
+    <style name="Widget.NetTap.Section" parent="Widget.Material3.CardView.Outlined">
+        <item name="cardCornerRadius">@dimen/card_corner</item>
+        <item name="strokeWidth">@dimen/card_stroke</item>
+        <item name="strokeColor">@color/nettap_section_stroke</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Widget.NetTap.BottomNav" parent="Widget.Material3.BottomNavigationView">
+        <item name="labelVisibilityMode">unlabeled</item>
+        <item name="itemIconSize">24dp</item>
     </style>
 </resources>

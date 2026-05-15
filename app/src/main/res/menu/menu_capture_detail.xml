@@ -1,0 +1,19 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_share_raw_json"
+        android:title="@string/action_share_raw_json"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_copy_url"
+        android:title="@string/action_copy_url"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_open_body"
+        android:title="@string/action_open_response_body"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_export_entry"
+        android:title="@string/action_export_entry"
+        app:showAsAction="never" />
+</menu>

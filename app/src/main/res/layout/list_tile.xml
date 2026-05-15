@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="@dimen/list_item_min_height"
+    android:orientation="horizontal"
+    android:padding="@dimen/list_item_padding_h">
+
+    <ImageView
+        android:id="@+id/tile_leading"
+        android:layout_width="@dimen/list_leading_size"
+        android:layout_height="@dimen/list_leading_size"
+        android:contentDescription="@null"
+        app:tint="?attr/colorPrimary" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tile_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="@dimen/text_title" />
+
+        <TextView
+            android:id="@+id/tile_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="@dimen/text_subtitle"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/tile_trailing"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:contentDescription="@null"
+        app:srcCompat="@drawable/ic_chevron_right"
+        app:tint="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

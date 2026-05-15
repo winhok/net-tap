@@ -41,7 +41,7 @@ public final class PeekBodyReaderTest {
     @Test
     public void peekBytesReturnsCompleteBytesForSmallBody() {
         byte[] payload = "hello, world".getBytes(StandardCharsets.UTF_8);
-        ResponseBody body = ResponseBody.create(TEXT, payload);
+        ResponseBody body = ResponseBody.create(payload, TEXT);
 
         PeekBodyReader.ProbeResult result = PeekBodyReader.peekBytes(body, 1024);
 
@@ -57,7 +57,7 @@ public final class PeekBodyReaderTest {
         for (int i = 0; i < payload.length; i++) {
             payload[i] = (byte) i;
         }
-        ResponseBody body = ResponseBody.create(TEXT, payload);
+        ResponseBody body = ResponseBody.create(payload, TEXT);
 
         PeekBodyReader.ProbeResult result = PeekBodyReader.peekBytes(body, 1024);
 
@@ -74,7 +74,7 @@ public final class PeekBodyReaderTest {
         for (int i = 0; i < payload.length; i++) {
             payload[i] = (byte) (i % 251);
         }
-        ResponseBody body = ResponseBody.create(TEXT, payload);
+        ResponseBody body = ResponseBody.create(payload, TEXT);
 
         PeekBodyReader.ProbeResult result = PeekBodyReader.peekBytes(body, 512);
 
@@ -93,7 +93,7 @@ public final class PeekBodyReaderTest {
         for (int i = 0; i < payload.length; i++) {
             payload[i] = (byte) i;
         }
-        ResponseBody body = ResponseBody.create(TEXT, payload);
+        ResponseBody body = ResponseBody.create(payload, TEXT);
 
         PeekBodyReader.ProbeResult result = PeekBodyReader.peekBytes(body, 256);
 
@@ -107,7 +107,7 @@ public final class PeekBodyReaderTest {
     @Test
     public void peekDoesNotConsumeOriginalBody() throws Exception {
         String text = "the quick brown fox jumps over the lazy dog";
-        ResponseBody body = ResponseBody.create(TEXT, text.getBytes(StandardCharsets.UTF_8));
+        ResponseBody body = ResponseBody.create(text.getBytes(StandardCharsets.UTF_8), TEXT);
 
         PeekBodyReader.ProbeResult result = PeekBodyReader.peekBytes(body, 1024);
         assertNotNull(result);
@@ -173,7 +173,7 @@ public final class PeekBodyReaderTest {
     @Test
     public void peekBytesUsesCustomBufferClassResolver() {
         byte[] payload = "custom resolver payload".getBytes(StandardCharsets.UTF_8);
-        ResponseBody body = ResponseBody.create(TEXT, payload);
+        ResponseBody body = ResponseBody.create(payload, TEXT);
 
         PeekBodyReader.ProbeResult result =
                 PeekBodyReader.peekBytes(body, 1024, loader -> Buffer.class);
@@ -185,7 +185,7 @@ public final class PeekBodyReaderTest {
 
     @Test
     public void peekBytesReturnsNullWhenResolverReturnsNull() {
-        ResponseBody body = ResponseBody.create(TEXT, "payload".getBytes(StandardCharsets.UTF_8));
+        ResponseBody body = ResponseBody.create("payload".getBytes(StandardCharsets.UTF_8), TEXT);
 
         PeekBodyReader.ProbeResult result =
                 PeekBodyReader.peekBytes(body, 1024, loader -> null);
@@ -195,7 +195,7 @@ public final class PeekBodyReaderTest {
 
     @Test
     public void peekBytesReturnsNullWhenResolverIsNull() {
-        ResponseBody body = ResponseBody.create(TEXT, "payload".getBytes(StandardCharsets.UTF_8));
+        ResponseBody body = ResponseBody.create("payload".getBytes(StandardCharsets.UTF_8), TEXT);
 
         assertNull(PeekBodyReader.peekBytes(body, 1024, null));
     }

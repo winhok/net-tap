@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.data.DomainBucket;
 
 public final class CaptureDomainsAdapter extends RecyclerView.Adapter<CaptureDomainsAdapter.Holder> {
@@ -40,7 +41,7 @@ public final class CaptureDomainsAdapter extends RecyclerView.Adapter<CaptureDom
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         TextView view = new TextView(parent.getContext());
-        view.setPadding(12, 12, 12, 12);
+        Dimens.setPaddingDp(view, 12, 12);
         return new Holder(view);
     }
 

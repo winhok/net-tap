@@ -17,13 +17,13 @@ public class XposedLogger {
 
     /**
      * Log to Xposed log. View through adb logcat.
-     * 
-     * @param String message        Message will be formatted if additional arguments passed.
-     * @param Object[] objects      
+     *
+     * @param message Message will be formatted if additional arguments passed.
+     * @param objects formatting arguments
      */
     public void log(String message, Object ... objects) {
         if (objects.length > 0) {
-            message = String.format(message, (Object[]) objects);
+            message = String.format(message, objects);
         }
         String prefixedMessage = formatPrefixed(this.prefix, message);
         try {

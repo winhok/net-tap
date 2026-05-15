@@ -3,6 +3,7 @@ package xyz.winhok.nettap.ui.adapter;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 
 import xyz.winhok.nettap.ui.data.CaptureSessionStore;
 import xyz.winhok.nettap.ui.data.CaptureUiEvent;
@@ -20,7 +21,7 @@ public final class CaptureDiffCallbackTest {
         CaptureUiEvent newEvent = event("other", 200);
 
         CaptureSequenceDiffCallback diff = new CaptureSequenceDiffCallback(
-                Arrays.asList(oldEvent),
+                Collections.singletonList(oldEvent),
                 Arrays.asList(updatedEvent, newEvent)
         );
 
@@ -36,8 +37,8 @@ public final class CaptureDiffCallbackTest {
         DomainBucket updatedBucket = bucketWithCount(2);
 
         CaptureDomainsDiffCallback diff = new CaptureDomainsDiffCallback(
-                Arrays.asList(oldBucket),
-                Arrays.asList(updatedBucket)
+                Collections.singletonList(oldBucket),
+                Collections.singletonList(updatedBucket)
         );
 
         assertTrue(diff.areItemsTheSame(0, 0));

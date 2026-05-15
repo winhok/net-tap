@@ -135,8 +135,7 @@ public final class NetTapUiState {
     }
 
     public static void setDetailQuery(String query) {
-        String value = query == null ? "" : query.trim();
-        detailQuery = value;
+        detailQuery = query == null ? "" : query.trim();
     }
 
     public static String getDetailQuery() {

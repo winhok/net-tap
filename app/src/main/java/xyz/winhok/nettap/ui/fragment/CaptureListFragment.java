@@ -2,18 +2,20 @@ package xyz.winhok.nettap.ui.fragment;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
+import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Lifecycle;
 import androidx.viewpager2.widget.ViewPager2;
 
 import java.util.List;
@@ -30,6 +32,7 @@ import xyz.winhok.nettap.ui.adapter.CaptureListPagerAdapter;
 import xyz.winhok.nettap.ui.data.CaptureUiEvent;
 import xyz.winhok.nettap.ui.data.CaptureSessionStore;
 
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
@@ -39,7 +42,7 @@ public final class CaptureListFragment extends Fragment {
     private SortOrder sortOrder = SortOrder.NEWEST_FIRST;
     private ViewPager2 pager;
     private TextView status;
-    private Button freezeButton;
+    private ExtendedFloatingActionButton freezeButton;
 
     @Nullable
     @Override
@@ -50,22 +53,9 @@ public final class CaptureListFragment extends Fragment {
     ) {
         preferences = new UiPreferences(requireContext());
         sortOrder = preferences.getDefaultSort();
-        LinearLayout root = new LinearLayout(requireContext());
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(18, 18, 18, 18);
-
-        status = new TextView(requireContext());
-        root.addView(status);
-
-        search = new SearchView(requireContext());
-        search.setIconifiedByDefault(false);
-        search.setQueryHint(getString(R.string.search_hint));
-        root.addView(search);
-
-        LinearLayout controls = new LinearLayout(requireContext());
-        controls.setOrientation(LinearLayout.HORIZONTAL);
-        root.addView(controls);
-        addFreezeButton(controls);
+        View root = inflater.inflate(R.layout.fragment_capture_list, container, false);
+        status = root.findViewById(R.id.status);
+        freezeButton = root.findViewById(R.id.fab_freeze);
         updateSessionControls();
         freezeButton.setOnClickListener(view -> {
             if (NetTapUiState.store().getState() == CaptureSessionStore.State.FROZEN) {
@@ -76,59 +66,65 @@ public final class CaptureListFragment extends Fragment {
             updateSessionControls();
             refreshCurrentPage();
         });
-        addButton(controls, R.string.action_clear, () -> {
-            new AlertDialog.Builder(requireContext())
-                    .setTitle(R.string.clear_confirm_title)
-                    .setMessage(R.string.clear_confirm_message)
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .setPositiveButton(R.string.action_clear, (dialog, which) -> {
-                        CaptureSessionActions.clearCurrentSession(this::clearQuery);
-                        updateSessionControls();
-                        refreshCurrentPage();
-                    })
-                    .show();
-        });
-        addSortButton(controls);
-        addButton(controls, R.string.action_export_visible, () -> {
-            List<CaptureUiEvent> events = NetTapUiState.filteredEvents(
-                    currentQuery(),
-                    sortOrder.isNewestFirst()
-            );
-            ((MainActivity) requireActivity()).exportHar(events);
-        });
-        addButton(controls, R.string.action_export_all, () -> {
-            List<CaptureUiEvent> events = NetTapUiState.store().sequenceOldestFirst();
-            ((MainActivity) requireActivity()).exportHar(events);
-        });
-
-        TabLayout tabs = new TabLayout(requireContext());
-        root.addView(tabs);
-        pager = new ViewPager2(requireContext());
-        pager.setId(View.generateViewId());
+        TabLayout tabs = root.findViewById(R.id.tabs);
+        pager = root.findViewById(R.id.pager);
         pager.setAdapter(new CaptureListPagerAdapter(this));
-        root.addView(pager, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-        ));
         new TabLayoutMediator(tabs, pager, (tab, position) -> {
             tab.setText(UiTabs.captureTitle(position));
         }).attach();
-        search.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+        installMenuProvider();
+        return root;
+    }
+
+    private void installMenuProvider() {
+        requireActivity().addMenuProvider(new MenuProvider() {
             @Override
-            public boolean onQueryTextSubmit(String query) {
-                refreshCurrentPage();
-                search.clearFocus();
-                return true;
+            public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+                inflater.inflate(R.menu.menu_capture, menu);
+                MenuItem searchItem = menu.findItem(R.id.action_search);
+                search = (SearchView) searchItem.getActionView();
+                if (search == null) {
+                    return;
+                }
+                search.setIconifiedByDefault(false);
+                search.setQueryHint(getString(R.string.search_hint));
+                search.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                    @Override
+                    public boolean onQueryTextSubmit(String query) {
+                        refreshCurrentPage();
+                        search.clearFocus();
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onQueryTextChange(String newText) {
+                        refreshCurrentPage();
+                        return true;
+                    }
+                });
             }
 
             @Override
-            public boolean onQueryTextChange(String newText) {
-                refreshCurrentPage();
-                return true;
+            public boolean onMenuItemSelected(@NonNull MenuItem item) {
+                if (item.getItemId() == R.id.action_clear) {
+                    clearSession();
+                    return true;
+                }
+                if (item.getItemId() == R.id.action_sort) {
+                    showSortDialog();
+                    return true;
+                }
+                if (item.getItemId() == R.id.action_export_visible) {
+                    exportVisible();
+                    return true;
+                }
+                if (item.getItemId() == R.id.action_export_all) {
+                    exportAll();
+                    return true;
+                }
+                return false;
             }
-        });
-        return root;
+        }, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
     }
 
     public String currentQuery() {
@@ -156,47 +152,49 @@ public final class CaptureListFragment extends Fragment {
         refreshCurrentPage();
     }
 
-    private void addButton(LinearLayout controls, int label, Runnable action) {
-        addRawButton(controls, getString(label), action);
+    private void clearSession() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.clear_confirm_title)
+                .setMessage(R.string.clear_confirm_message)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.action_clear, (dialog, which) -> {
+                    CaptureSessionActions.clearCurrentSession(this::clearQuery);
+                    updateSessionControls();
+                    refreshCurrentPage();
+                })
+                .show();
     }
 
-    private void addRawButton(LinearLayout controls, String label, Runnable action) {
-        Button button = new Button(requireContext());
-        button.setText(label);
-        button.setAllCaps(false);
-        button.setOnClickListener(view -> action.run());
-        controls.addView(button);
-    }
-
-    private void addFreezeButton(LinearLayout controls) {
-        freezeButton = new Button(requireContext());
-        freezeButton.setAllCaps(false);
-        controls.addView(freezeButton);
-    }
-
-    private void addSortButton(LinearLayout controls) {
-        Button button = new Button(requireContext());
-        button.setText(R.string.action_sort);
-        button.setAllCaps(false);
-        button.setOnClickListener(this::showSortMenu);
-        controls.addView(button);
-    }
-
-    private void showSortMenu(View anchor) {
-        PopupMenu menu = new PopupMenu(requireContext(), anchor);
-        menu.getMenu().setGroupCheckable(0, true, true);
-        for (SortOrder order : SortOrder.values()) {
-            menu.getMenu()
-                    .add(0, order.ordinal(), order.ordinal(), order.labelResId())
-                    .setCheckable(true)
-                    .setChecked(order == sortOrder);
+    private void showSortDialog() {
+        SortOrder[] orders = SortOrder.values();
+        String[] labels = new String[orders.length];
+        int checked = 0;
+        for (int i = 0; i < orders.length; i++) {
+            labels[i] = getString(orders[i].labelResId());
+            if (orders[i] == sortOrder) {
+                checked = i;
+            }
         }
-        menu.setOnMenuItemClickListener(item -> {
-            SortOrder selected = SortOrder.fromMenuId(item.getItemId());
-            setSortOrder(selected);
-            return true;
-        });
-        menu.show();
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.action_sort)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    setSortOrder(orders[which]);
+                    dialog.dismiss();
+                })
+                .show();
+    }
+
+    private void exportVisible() {
+        List<CaptureUiEvent> events = NetTapUiState.filteredEvents(
+                currentQuery(),
+                sortOrder.isNewestFirst()
+        );
+        ((MainActivity) requireActivity()).exportHar(events);
+    }
+
+    private void exportAll() {
+        List<CaptureUiEvent> events = NetTapUiState.store().sequenceOldestFirst();
+        ((MainActivity) requireActivity()).exportHar(events);
     }
 
     private void setSortOrder(SortOrder selected) {
@@ -208,9 +206,9 @@ public final class CaptureListFragment extends Fragment {
     private void updateSessionControls() {
         CaptureSessionStore.State state = NetTapUiState.store().getState();
         if (freezeButton != null) {
-            freezeButton.setText(state == CaptureSessionStore.State.FROZEN
-                    ? R.string.action_resume
-                    : R.string.action_freeze);
+            boolean frozen = state == CaptureSessionStore.State.FROZEN;
+            freezeButton.setText(frozen ? R.string.action_resume : R.string.action_freeze);
+            freezeButton.setIconResource(frozen ? R.drawable.ic_play_arrow : R.drawable.ic_pause);
         }
         if (status != null) {
             status.setText(getString(
@@ -241,5 +239,14 @@ public final class CaptureListFragment extends Fragment {
                 ((CapturePage) fragment).refresh();
             }
         }
+    }
+
+    @Override
+    public void onDestroyView() {
+        search = null;
+        freezeButton = null;
+        pager = null;
+        status = null;
+        super.onDestroyView();
     }
 }

@@ -1,6 +1,5 @@
 // Copyright (c) 2026 winhok
 // Licensed under the same license as the rest of net-tap.
-// View architecture inspired by common Android UI patterns (ConstraintLayout + DrawerLayout + Fragment).
 // No third-party source code is reproduced verbatim in this file.
 
 package xyz.winhok.nettap.ui.widget;
@@ -11,6 +10,7 @@ import android.graphics.Paint;
 import android.util.AttributeSet;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import xyz.winhok.nettap.R;
@@ -27,7 +27,7 @@ public final class OrbitView extends View {
     }
 
     @Override
-    protected void onDraw(Canvas canvas) {
+    protected void onDraw(@NonNull Canvas canvas) {
         super.onDraw(canvas);
         float radius = Math.min(getWidth(), getHeight()) * 0.35f;
         paint.setStyle(Paint.Style.STROKE);

@@ -4,9 +4,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -60,7 +59,7 @@ public final class HarExportWorkerTest {
         HarExportWorker worker = new HarExportWorker(Runnable::run, callbackExecutor);
         AtomicReference<Exception> failure = new AtomicReference<>();
 
-        worker.export(null, Arrays.asList(), new HarExportWorker.Callback() {
+        worker.export(null, Collections.emptyList(), new HarExportWorker.Callback() {
             @Override
             public void onSuccess(HarExportResult value) {
             }

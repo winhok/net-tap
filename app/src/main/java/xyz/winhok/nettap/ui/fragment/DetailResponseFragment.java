@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -14,6 +13,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.MainActivity;
 import xyz.winhok.nettap.ui.NetTapUiState;
 import xyz.winhok.nettap.ui.TextHighlighter;
@@ -23,12 +23,15 @@ import xyz.winhok.nettap.ui.data.BodyDisplayState;
 import xyz.winhok.nettap.ui.widget.JsonHighlightView;
 import xyz.winhok.nettap.ui.widget.SpacedRecyclerView;
 
+import com.google.android.material.button.MaterialButton;
+
 public final class DetailResponseFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
+        Dimens.setPaddingDp(root, 12, 12);
         LinearLayout controls = new LinearLayout(requireContext());
         controls.setOrientation(LinearLayout.HORIZONTAL);
         root.addView(controls);
@@ -36,11 +39,12 @@ public final class DetailResponseFragment extends Fragment {
         CaptureUiEvent event = DetailGeneralFragment.findEvent();
         if (event == null) {
             text.setText(R.string.empty_response_selected);
+            Dimens.setPaddingDp(text, 12, 8);
             root.addView(text);
             return root;
         }
         String query = NetTapUiState.getDetailQuery();
-        Button openBody = new Button(requireContext());
+        MaterialButton openBody = new MaterialButton(requireContext());
         openBody.setText(R.string.action_open_body);
         openBody.setAllCaps(false);
         openBody.setOnClickListener(view -> {
@@ -48,7 +52,7 @@ public final class DetailResponseFragment extends Fragment {
             ((MainActivity) requireActivity()).showBodyViewer();
         });
         controls.addView(openBody);
-        Button exportEntry = new Button(requireContext());
+        MaterialButton exportEntry = new MaterialButton(requireContext());
         exportEntry.setText(R.string.action_export_entry);
         exportEntry.setAllCaps(false);
         exportEntry.setOnClickListener(view -> ((MainActivity) requireActivity()).exportHar(java.util.Collections.singletonList(event)));
@@ -59,9 +63,11 @@ public final class DetailResponseFragment extends Fragment {
                 event.getResponseCode() + " " + event.getResponseMessage(),
                 query
         ));
+        Dimens.setPaddingDp(responseLine, 12, 8);
         root.addView(responseLine);
         TextView headerTitle = new TextView(requireContext());
         headerTitle.setText(R.string.detail_headers);
+        Dimens.setPaddingDp(headerTitle, 12, 8);
         root.addView(headerTitle);
         HeaderListAdapter headers = new HeaderListAdapter();
         headers.submit(event.getResponseHeaders(), query);
@@ -75,16 +81,19 @@ public final class DetailResponseFragment extends Fragment {
         ));
         TextView bodyTitle = new TextView(requireContext());
         bodyTitle.setText(R.string.detail_body);
+        Dimens.setPaddingDp(bodyTitle, 12, 8);
         root.addView(bodyTitle);
         BodyDisplayState bodyState = BodyDisplayState.from(event.getResponseBody());
         if (bodyState.requiresLargeBodyConfirmation()) {
             TextView bodyStatus = new TextView(requireContext());
             bodyStatus.setText(bodyState.getStatus());
+            Dimens.setPaddingDp(bodyStatus, 12, 8);
             root.addView(bodyStatus);
         } else {
             if (!"OK".equals(bodyState.getStatus())) {
                 TextView bodyStatus = new TextView(requireContext());
                 bodyStatus.setText(bodyState.getStatus());
+                Dimens.setPaddingDp(bodyStatus, 12, 8);
                 root.addView(bodyStatus);
             }
             JsonHighlightView body = new JsonHighlightView(requireContext());

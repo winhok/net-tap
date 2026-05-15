@@ -13,7 +13,7 @@ public final class LogcatJsonLogger {
         }
 
         String safeValue = value == null ? "" : value;
-        if (safeValue.length() == 0) {
+        if (safeValue.isEmpty()) {
             List<String> result = new ArrayList<>();
             result.add("");
             return result;
@@ -33,7 +33,7 @@ public final class LogcatJsonLogger {
         }
 
         String safeValue = value == null ? "" : value;
-        if (safeValue.length() == 0) {
+        if (safeValue.isEmpty()) {
             List<String> result = new ArrayList<>();
             result.add("");
             return result;

@@ -223,7 +223,7 @@ public final class CronetUrlRequestHook {
                     hookName,
                     state.method,
                     state.url,
-                    new LinkedHashMap<String, String>(),
+                    new LinkedHashMap<>(),
                     buildRequestBody(state),
                     state.responseCode,
                     state.responseMessage,
@@ -336,7 +336,7 @@ public final class CronetUrlRequestHook {
     }
 
     private static void putIfPresent(LinkedHashMap<String, String> headers, String name, String value) {
-        if (headers == null || value == null || value.length() == 0) {
+        if (headers == null || value == null || value.isEmpty()) {
             return;
         }
         headers.put(name, value);

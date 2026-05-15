@@ -1,6 +1,5 @@
 // Copyright (c) 2026 winhok
 // Licensed under the same license as the rest of net-tap.
-// View architecture inspired by common Android UI patterns (ConstraintLayout + DrawerLayout + Fragment).
 // No third-party source code is reproduced verbatim in this file.
 
 package xyz.winhok.nettap.ui.widget;

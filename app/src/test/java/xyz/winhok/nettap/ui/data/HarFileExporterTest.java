@@ -8,6 +8,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.Collections;
 
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
@@ -27,7 +28,7 @@ public final class HarFileExporterTest {
 
         HarExportResult result = HarFileExporter.write(
                 exportDir,
-                Arrays.asList(event),
+                Collections.singletonList(event),
                 "20260514-010203"
         );
 
@@ -68,8 +69,8 @@ public final class HarFileExporterTest {
         ));
         File exportDir = temporaryFolder.newFolder("rapid-export");
 
-        HarExportResult first = HarFileExporter.write(exportDir, Arrays.asList(event));
-        HarExportResult second = HarFileExporter.write(exportDir, Arrays.asList(event));
+        HarExportResult first = HarFileExporter.write(exportDir, Collections.singletonList(event));
+        HarExportResult second = HarFileExporter.write(exportDir, Collections.singletonList(event));
 
         assertNotEquals(first.getFile().getName(), second.getFile().getName());
         assertTrue(first.getFile().exists());

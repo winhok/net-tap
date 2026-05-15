@@ -15,12 +15,10 @@ public final class CaptureEvent {
     // v2: field `okhttpHook` renamed to `hook` (v1 was implicit — no schemaVersion was emitted).
     private static final int SCHEMA_VERSION = 2;
 
-    private static final ThreadLocal<SimpleDateFormat> TIMESTAMP_FORMAT = new ThreadLocal<SimpleDateFormat>() {
+    private static final ThreadLocal<SimpleDateFormat> TIMESTAMP_FORMAT = new ThreadLocal<>() {
         @Override
         protected SimpleDateFormat initialValue() {
-            SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
-            fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
-            return fmt;
+            return newTimestampFormat();
         }
     };
 
@@ -28,7 +26,18 @@ public final class CaptureEvent {
 
     /** Current wall-clock timestamp in the project's fixed UTC millisecond format. */
     public static String timestampNow() {
-        return TIMESTAMP_FORMAT.get().format(new Date(System.currentTimeMillis()));
+        SimpleDateFormat format = TIMESTAMP_FORMAT.get();
+        if (format == null) {
+            format = newTimestampFormat();
+            TIMESTAMP_FORMAT.set(format);
+        }
+        return format.format(new Date(System.currentTimeMillis()));
+    }
+
+    private static SimpleDateFormat newTimestampFormat() {
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+        fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return fmt;
     }
 
     /** Elapsed milliseconds since {@code startNanos}, clamped to zero. */

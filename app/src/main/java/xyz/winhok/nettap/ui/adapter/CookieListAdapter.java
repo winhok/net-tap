@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.TextHighlighter;
 import xyz.winhok.nettap.ui.data.CookieEntry;
 
@@ -26,8 +27,9 @@ public final class CookieListAdapter extends RecyclerView.Adapter<CookieListAdap
     }
 
     public void submit(List<CookieEntry> next, String query) {
+        int oldSize = cookies.size();
         replaceCookies(next, query);
-        notifyDataSetChanged();
+        notifyReplacement(oldSize, cookies.size());
     }
 
     void replaceCookies(List<CookieEntry> next) {
@@ -46,6 +48,18 @@ public final class CookieListAdapter extends RecyclerView.Adapter<CookieListAdap
         return query;
     }
 
+    private void notifyReplacement(int oldSize, int newSize) {
+        int changed = Math.min(oldSize, newSize);
+        if (changed > 0) {
+            notifyItemRangeChanged(0, changed);
+        }
+        if (newSize > oldSize) {
+            notifyItemRangeInserted(oldSize, newSize - oldSize);
+        } else if (oldSize > newSize) {
+            notifyItemRangeRemoved(newSize, oldSize - newSize);
+        }
+    }
+
     public List<CookieEntry> snapshot() {
         return new ArrayList<>(cookies);
     }
@@ -54,7 +68,7 @@ public final class CookieListAdapter extends RecyclerView.Adapter<CookieListAdap
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         TextView view = new TextView(parent.getContext());
-        view.setPadding(12, 8, 12, 8);
+        Dimens.setPaddingDp(view, 12, 8);
         return new Holder(view);
     }
 

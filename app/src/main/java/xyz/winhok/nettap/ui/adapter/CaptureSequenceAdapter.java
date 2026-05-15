@@ -1,16 +1,24 @@
 package xyz.winhok.nettap.ui.adapter;
 
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.chip.Chip;
+
 import java.util.ArrayList;
 import java.util.List;
 
+import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.CaptureRowSubtitleFormatter;
+import xyz.winhok.nettap.ui.MethodIcon;
+import xyz.winhok.nettap.ui.StatusColor;
 import xyz.winhok.nettap.ui.TextHighlighter;
 import xyz.winhok.nettap.ui.data.CaptureUiEvent;
 
@@ -47,20 +55,26 @@ public final class CaptureSequenceAdapter extends RecyclerView.Adapter<CaptureSe
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        TextView view = new TextView(parent.getContext());
-        view.setPadding(12, 12, 12, 12);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_capture_row, parent, false);
         return new Holder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull Holder holder, int position) {
         CaptureUiEvent event = events.get(position);
-        String marker = callbacks.isRead(event) ? "READ " : "NEW ";
-        String text = marker + event.getMethod() + " " + event.getDisplayStatus() + " " + event.getUrl()
-                + "\n" + event.getHook() + " | " + event.getPackageName() + " | " + event.getTimestamp();
-        holder.text.setText(TextHighlighter.highlight(holder.text.getContext(), text, query));
-        holder.text.setOnClickListener(view -> callbacks.onOpen(event));
-        holder.text.setOnLongClickListener(view -> {
+        holder.methodBadge.setImageResource(MethodIcon.forMethod(event.getMethod()));
+        String title = event.getMethod() + " " + event.getDisplayStatus() + " " + event.getUrl();
+        holder.title.setText(TextHighlighter.highlight(holder.title.getContext(), title, query));
+        holder.subtitle.setText(CaptureRowSubtitleFormatter.format(position, event));
+        holder.statusChip.setText(event.getDisplayStatus());
+        holder.statusChip.setChipBackgroundColor(StatusColor.forCode(
+                event.getResponseCode(),
+                holder.itemView.getContext()
+        ));
+        holder.itemView.setAlpha(callbacks.isRead(event) ? 0.55f : 1f);
+        holder.itemView.setOnClickListener(view -> callbacks.onOpen(event));
+        holder.itemView.setOnLongClickListener(view -> {
             callbacks.onShowActions(event, view);
             return true;
         });
@@ -80,11 +94,17 @@ public final class CaptureSequenceAdapter extends RecyclerView.Adapter<CaptureSe
     }
 
     static final class Holder extends RecyclerView.ViewHolder {
-        final TextView text;
+        final ImageView methodBadge;
+        final TextView title;
+        final TextView subtitle;
+        final Chip statusChip;
 
-        Holder(@NonNull TextView itemView) {
+        Holder(@NonNull View itemView) {
             super(itemView);
-            text = itemView;
+            methodBadge = itemView.findViewById(R.id.method_badge);
+            title = itemView.findViewById(R.id.title);
+            subtitle = itemView.findViewById(R.id.subtitle);
+            statusChip = itemView.findViewById(R.id.status_chip);
         }
     }
 

@@ -8,8 +8,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Input stream that mirrors every returned byte into a bounded capture
- * buffer. Fires {@link #onEnd} at most once, either when the underlying
- * stream reports EOF or when {@link #close()} is called.
+ * buffer. Fires {@link EndCallback#onEnd(byte[], boolean, long)} at most once,
+ * either when the underlying stream reports EOF or when {@link #close()} is
+ * called.
  */
 public final class TeeInputStream extends FilterInputStream {
 

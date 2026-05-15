@@ -1,5 +1,6 @@
 package xyz.winhok.nettap.ui;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 
@@ -33,6 +34,7 @@ public final class UiPreferences {
     }
 
     @SuppressWarnings("deprecation")
+    @SuppressLint("WorldReadableFiles")
     static SharedPreferences openPreferences(Context context) {
         Context appContext = context.getApplicationContext();
         try {
@@ -176,6 +178,14 @@ public final class UiPreferences {
                 isTlsKeylogEnabled(),
                 isCronetKeylogEnabled()
         );
+    }
+
+    public boolean applyRealtimeTransport() {
+        if (isTransportEnabled()) {
+            return NetTapUiState.startRealtimeServer(getTransportPort());
+        }
+        NetTapUiState.stopRealtimeServer();
+        return true;
     }
 
     private static Set<String> parsePackageAllowlist(String text) {

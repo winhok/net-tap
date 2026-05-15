@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.TextHighlighter;
 
 public final class HeaderListAdapter extends RecyclerView.Adapter<HeaderListAdapter.Holder> {
@@ -28,8 +29,9 @@ public final class HeaderListAdapter extends RecyclerView.Adapter<HeaderListAdap
     }
 
     public void submit(Map<String, String> next, String query) {
+        int oldSize = entries.size();
         replaceHeaders(next, query);
-        notifyDataSetChanged();
+        notifyReplacement(oldSize, entries.size());
     }
 
     void replaceHeaders(Map<String, String> next) {
@@ -50,6 +52,18 @@ public final class HeaderListAdapter extends RecyclerView.Adapter<HeaderListAdap
         return query;
     }
 
+    private void notifyReplacement(int oldSize, int newSize) {
+        int changed = Math.min(oldSize, newSize);
+        if (changed > 0) {
+            notifyItemRangeChanged(0, changed);
+        }
+        if (newSize > oldSize) {
+            notifyItemRangeInserted(oldSize, newSize - oldSize);
+        } else if (oldSize > newSize) {
+            notifyItemRangeRemoved(newSize, oldSize - newSize);
+        }
+    }
+
     public Map<String, String> snapshot() {
         return new LinkedHashMap<>(headers);
     }
@@ -58,7 +72,7 @@ public final class HeaderListAdapter extends RecyclerView.Adapter<HeaderListAdap
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         TextView view = new TextView(parent.getContext());
-        view.setPadding(12, 8, 12, 8);
+        Dimens.setPaddingDp(view, 12, 8);
         return new Holder(view);
     }
 

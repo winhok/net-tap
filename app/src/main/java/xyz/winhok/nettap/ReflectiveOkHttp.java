@@ -19,7 +19,7 @@ public final class ReflectiveOkHttp {
     private static final String RESPONSE_BODY_UNAVAILABLE = "response body unavailable";
     private static final int MAX_LOGGED_FAILURE_CLASSES = 128;
     private static final Set<String> LOGGED_FAILURE_CLASSES =
-            Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private ReflectiveOkHttp() {
     }

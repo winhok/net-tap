@@ -192,7 +192,7 @@ public final class ReflectiveOkHttpBodyCaptureTest {
     public void responseBodyOmitsBinaryBody() {
         Response response = response(
                 "https://example.com/image.png",
-                Headers.of(new LinkedHashMap<String, String>()),
+                Headers.of(new LinkedHashMap<>()),
                 ResponseBody.create(new byte[] {1, 2, 3}, MediaType.get("image/png"))
         );
 
@@ -205,7 +205,7 @@ public final class ReflectiveOkHttpBodyCaptureTest {
     public void responseBodyOmitsUnknownContentType() {
         Response response = response(
                 "https://example.com/data",
-                Headers.of(new LinkedHashMap<String, String>()),
+                Headers.of(new LinkedHashMap<>()),
                 ResponseBody.create(new byte[] {1, 2, 3}, null)
         );
 

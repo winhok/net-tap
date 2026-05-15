@@ -88,7 +88,7 @@ public final class InstallGuard {
         synchronized (INSTALLED) {
             Map<ClassLoader, Boolean> loaders = INSTALLED.get(hookId);
             if (loaders == null) {
-                loaders = Collections.synchronizedMap(new WeakHashMap<ClassLoader, Boolean>());
+                loaders = Collections.synchronizedMap(new WeakHashMap<>());
                 INSTALLED.put(hookId, loaders);
             }
             return loaders;

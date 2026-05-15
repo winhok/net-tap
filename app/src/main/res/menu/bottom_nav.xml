@@ -1,0 +1,18 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/tab_captures"
+        android:icon="@drawable/ic_workspaces_outlined"
+        android:title="@string/nav_capture" />
+    <item
+        android:id="@+id/tab_hooks"
+        android:icon="@drawable/ic_hardware_outlined"
+        android:title="@string/nav_hooks" />
+    <item
+        android:id="@+id/tab_config"
+        android:icon="@drawable/ic_description_outlined"
+        android:title="@string/nav_config" />
+    <item
+        android:id="@+id/tab_settings"
+        android:icon="@drawable/ic_settings_outlined"
+        android:title="@string/nav_settings" />
+</menu>

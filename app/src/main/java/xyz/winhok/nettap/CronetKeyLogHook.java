@@ -175,7 +175,7 @@ public final class CronetKeyLogHook {
     }
 
     private static boolean isShortObfuscatedName(String name) {
-        if (name == null || name.length() == 0 || name.length() > 8) {
+        if (name == null || name.isEmpty() || name.length() > 8) {
             return false;
         }
         for (int i = 0; i < name.length(); i++) {

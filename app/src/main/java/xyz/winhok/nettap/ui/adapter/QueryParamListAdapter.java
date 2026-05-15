@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.TextHighlighter;
 import xyz.winhok.nettap.ui.data.QueryParam;
 
@@ -26,8 +27,9 @@ public final class QueryParamListAdapter extends RecyclerView.Adapter<QueryParam
     }
 
     public void submit(List<QueryParam> next, String query) {
+        int oldSize = params.size();
         replaceParams(next, query);
-        notifyDataSetChanged();
+        notifyReplacement(oldSize, params.size());
     }
 
     void replaceParams(List<QueryParam> next) {
@@ -46,11 +48,23 @@ public final class QueryParamListAdapter extends RecyclerView.Adapter<QueryParam
         return query;
     }
 
+    private void notifyReplacement(int oldSize, int newSize) {
+        int changed = Math.min(oldSize, newSize);
+        if (changed > 0) {
+            notifyItemRangeChanged(0, changed);
+        }
+        if (newSize > oldSize) {
+            notifyItemRangeInserted(oldSize, newSize - oldSize);
+        } else if (oldSize > newSize) {
+            notifyItemRangeRemoved(newSize, oldSize - newSize);
+        }
+    }
+
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         TextView view = new TextView(parent.getContext());
-        view.setPadding(12, 8, 12, 8);
+        Dimens.setPaddingDp(view, 12, 8);
         return new Holder(view);
     }
 

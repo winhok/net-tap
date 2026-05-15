@@ -147,23 +147,23 @@ public final class RuntimeCaptureConfig {
             Method getString = prefsClass.getMethod("getString", String.class, String.class);
             Method getStringSet = prefsClass.getMethod("getStringSet", String.class, Set.class);
             reload.invoke(prefs);
-            boolean legacyCronetKeylog = (Boolean) getBoolean.invoke(
-                    prefs,
-                    LEGACY_HOOK_CRONET_KEYLOG,
+            boolean legacyCronetKeylog = booleanValue(
+                    getBoolean.invoke(prefs, LEGACY_HOOK_CRONET_KEYLOG, cronetQuicKeylogEnabled),
                     cronetQuicKeylogEnabled
             );
-            boolean cronetKeylog = (Boolean) getBoolean.invoke(
-                    prefs,
-                    HOOK_CRONET_QUIC_KEYLOG,
+            boolean cronetKeylog = booleanValue(
+                    getBoolean.invoke(prefs, HOOK_CRONET_QUIC_KEYLOG, legacyCronetKeylog),
                     legacyCronetKeylog
             );
             applyOverrides(
-                    (Boolean) getBoolean.invoke(prefs, "transport.enabled", realtimeTransportEnabled),
-                    (Integer) getInt.invoke(prefs, "transport.port", realtimePort),
+                    booleanValue(getBoolean.invoke(prefs, "transport.enabled", realtimeTransportEnabled),
+                            realtimeTransportEnabled),
+                    intValue(getInt.invoke(prefs, "transport.port", realtimePort), realtimePort),
                     realtimeQueueCapacity,
                     realtimeTimeoutMs,
-                    (Boolean) getBoolean.invoke(prefs, "hook.builder_interceptor", builderInterceptorHookEnabled),
-                    (Boolean) getBoolean.invoke(prefs, "hook.tls_keylog", tlsKeylogEnabled),
+                    booleanValue(getBoolean.invoke(prefs, "hook.builder_interceptor", builderInterceptorHookEnabled),
+                            builderInterceptorHookEnabled),
+                    booleanValue(getBoolean.invoke(prefs, "hook.tls_keylog", tlsKeylogEnabled), tlsKeylogEnabled),
                     cronetKeylog
             );
             applyFilters(
@@ -260,5 +260,13 @@ public final class RuntimeCaptureConfig {
             return (Set<String>) value;
         }
         return Collections.emptySet();
+    }
+
+    private static boolean booleanValue(Object value, boolean fallback) {
+        return value instanceof Boolean ? (Boolean) value : fallback;
+    }
+
+    private static int intValue(Object value, int fallback) {
+        return value instanceof Integer ? (Integer) value : fallback;
     }
 }

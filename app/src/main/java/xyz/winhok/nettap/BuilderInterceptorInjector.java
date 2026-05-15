@@ -6,7 +6,7 @@ import java.util.WeakHashMap;
 
 final class BuilderInterceptorInjector {
     private static final java.util.Map<Object, Boolean> INJECTED_BUILDERS =
-            Collections.synchronizedMap(new WeakHashMap<Object, Boolean>());
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     private BuilderInterceptorInjector() {
     }

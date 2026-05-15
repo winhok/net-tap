@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import java.util.List;
 
 import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.MainActivity;
 import xyz.winhok.nettap.ui.NetTapUiState;
 import xyz.winhok.nettap.ui.adapter.CaptureDomainsAdapter;
@@ -50,7 +51,8 @@ public final class CaptureDomainsFragment extends Fragment implements CapturePag
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
         summary = new TextView(requireContext());
-        summary.setTextSize(18);
+        summary.setTextSize(13);
+        Dimens.setPaddingDp(summary, 12, 8);
         root.addView(summary);
 
         adapter = new CaptureDomainsAdapter(new CaptureDomainsAdapter.Callbacks() {

@@ -28,7 +28,7 @@ public final class ReflectCache {
     @SuppressLint("NewApi")
     private static final class ClassValueCache implements PerClassCache {
         private final ClassValue<ConcurrentHashMap<String, Object>> cv =
-                new ClassValue<ConcurrentHashMap<String, Object>>() {
+                new ClassValue<>() {
                     @Override
                     protected ConcurrentHashMap<String, Object> computeValue(Class<?> type) {
                         return new ConcurrentHashMap<>();

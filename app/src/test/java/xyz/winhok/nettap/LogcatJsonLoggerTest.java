@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.junit.Test;
@@ -18,7 +19,7 @@ public final class LogcatJsonLoggerTest {
 
     @Test
     public void chunksTreatsNullAsEmptyString() {
-        assertEquals(Arrays.asList(""), LogcatJsonLogger.chunks(null, 2));
+        assertEquals(Collections.singletonList(""), LogcatJsonLogger.chunks(null, 2));
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -43,7 +44,7 @@ public final class LogcatJsonLoggerTest {
         LogcatJsonLogger.emit("request-1", "abcdef", logger);
 
         assertEquals(
-                Arrays.asList(
+                Collections.singletonList(
                         "CAPTURE_JSON part=1/1 id=request-1 chunk=abcdef"
                 ),
                 logger.messages
@@ -74,7 +75,7 @@ public final class LogcatJsonLoggerTest {
         LogcatJsonLogger.emit("request-1", null, logger);
 
         assertEquals(
-                Arrays.asList("CAPTURE_JSON part=1/1 id=request-1 chunk="),
+                Collections.singletonList("CAPTURE_JSON part=1/1 id=request-1 chunk="),
                 logger.messages
         );
     }
@@ -87,7 +88,7 @@ public final class LogcatJsonLoggerTest {
         LogcatJsonLogger.emit("request-large", json, logger);
 
         assertEquals(
-                Arrays.asList(
+                Collections.singletonList(
                         "CAPTURE_JSON_OMITTED id=request-large size="
                                 + (CaptureConfig.LOGCAT_MAX_JSON_CHARS + 1)
                                 + " reason=logcat-size-gate"

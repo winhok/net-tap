@@ -2,7 +2,7 @@ package xyz.winhok.nettap.ui.adapter;
 
 import org.junit.Test;
 
-import java.util.Arrays;
+import java.util.Collections;
 
 import xyz.winhok.nettap.ui.data.QueryParam;
 import xyz.winhok.nettap.ui.data.QueryParamParser;
@@ -23,7 +23,7 @@ public final class QueryParamListAdapterTest {
     @Test
     public void submitHandlesNullList() {
         QueryParamListAdapter adapter = new QueryParamListAdapter();
-        adapter.replaceParams(Arrays.<QueryParam>asList());
+        adapter.replaceParams(Collections.<QueryParam>emptyList());
         adapter.replaceParams(null);
 
         assertEquals(0, adapter.getItemCount());

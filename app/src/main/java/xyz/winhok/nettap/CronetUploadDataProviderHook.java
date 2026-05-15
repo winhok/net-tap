@@ -27,7 +27,7 @@ public final class CronetUploadDataProviderHook {
 
     private static final CronetInstallRegistry INSTALL_REGISTRY = new CronetInstallRegistry();
     private static final Map<Object, Object> STREAM_TO_REQUEST =
-            Collections.synchronizedMap(new WeakHashMap<Object, Object>());
+            Collections.synchronizedMap(new WeakHashMap<>());
     private static final ConcurrentHashMap<Class<?>, Field> BUFFER_FIELD_CACHE = new ConcurrentHashMap<>();
 
     private CronetUploadDataProviderHook() {
@@ -97,7 +97,7 @@ public final class CronetUploadDataProviderHook {
     }
 
     private static boolean isShortObfuscatedName(String name) {
-        if (name == null || name.length() == 0 || name.length() > 8) {
+        if (name == null || name.isEmpty() || name.length() > 8) {
             return false;
         }
         for (int i = 0; i < name.length(); i++) {

@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.NetTapUiState;
 import xyz.winhok.nettap.ui.TextHighlighter;
 import xyz.winhok.nettap.ui.adapter.HeaderListAdapter;
@@ -29,10 +30,12 @@ public final class DetailRequestFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
+        Dimens.setPaddingDp(root, 12, 12);
         CaptureUiEvent event = DetailGeneralFragment.findEvent();
         if (event == null) {
             TextView text = new TextView(requireContext());
             text.setText(R.string.empty_request_selected);
+            Dimens.setPaddingDp(text, 12, 8);
             return text;
         }
         String query = NetTapUiState.getDetailQuery();
@@ -42,6 +45,7 @@ public final class DetailRequestFragment extends Fragment {
                 event.getMethod() + " " + event.getUrl(),
                 query
         ));
+        Dimens.setPaddingDp(requestLine, 12, 8);
         root.addView(requestLine);
         TextView path = new TextView(requireContext());
         path.setText(TextHighlighter.highlight(
@@ -49,11 +53,13 @@ public final class DetailRequestFragment extends Fragment {
                 getString(R.string.detail_path) + ": " + event.getPath(),
                 query
         ));
+        Dimens.setPaddingDp(path, 12, 8);
         root.addView(path);
         java.util.List<QueryParam> params = QueryParamParser.parse(event.getQuery());
         if (!params.isEmpty()) {
             TextView queryTitle = new TextView(requireContext());
             queryTitle.setText(R.string.detail_query_params);
+            Dimens.setPaddingDp(queryTitle, 12, 8);
             root.addView(queryTitle);
             QueryParamListAdapter queryParams = new QueryParamListAdapter();
             queryParams.submit(params, query);
@@ -67,6 +73,7 @@ public final class DetailRequestFragment extends Fragment {
         }
         TextView headerTitle = new TextView(requireContext());
         headerTitle.setText(R.string.detail_headers);
+        Dimens.setPaddingDp(headerTitle, 12, 8);
         root.addView(headerTitle);
         HeaderListAdapter headers = new HeaderListAdapter();
         headers.submit(event.getRequestHeaders(), query);
@@ -80,6 +87,7 @@ public final class DetailRequestFragment extends Fragment {
         ));
         TextView bodyTitle = new TextView(requireContext());
         bodyTitle.setText(R.string.detail_body);
+        Dimens.setPaddingDp(bodyTitle, 12, 8);
         root.addView(bodyTitle);
         JsonHighlightView body = new JsonHighlightView(requireContext());
         body.setJsonText(event.getRequestBody().getText(), query);

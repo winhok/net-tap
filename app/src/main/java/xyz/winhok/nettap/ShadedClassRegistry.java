@@ -4,6 +4,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+import androidx.annotation.NonNull;
+
 /**
  * Thread-safe registry holding discovered (possibly shaded) OkHttp class
  * references per ClassLoader. {@link ShadedOkHttpDiscovery} populates this
@@ -53,6 +55,7 @@ public final class ShadedClassRegistry {
         }
 
         @Override
+        @NonNull
         public String toString() {
             return "DiscoveredOkHttp{shaded=" + isShaded
                     + ", client=" + name(okHttpClient)
@@ -67,7 +70,7 @@ public final class ShadedClassRegistry {
     }
 
     private static final Map<ClassLoader, DiscoveredOkHttp> REGISTRY =
-            Collections.synchronizedMap(new WeakHashMap<ClassLoader, DiscoveredOkHttp>());
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     private ShadedClassRegistry() {
     }

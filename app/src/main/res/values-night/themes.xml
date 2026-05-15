@@ -2,9 +2,17 @@
     <style name="Theme.NetTap" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/nettap_primary</item>
         <item name="colorOnPrimary">@color/nettap_on_primary</item>
+        <item name="colorPrimaryContainer">@color/nettap_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/nettap_on_primary_container</item>
         <item name="colorSurface">@color/nettap_surface</item>
+        <item name="colorSurfaceVariant">@color/nettap_surface_variant</item>
         <item name="colorOnSurface">@color/nettap_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/nettap_on_surface_variant</item>
+        <item name="colorOutline">@color/nettap_outline</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:fontFamily">sans</item>
+        <item name="toolbarStyle">@style/Widget.NetTap.Toolbar</item>
+        <item name="materialCardViewStyle">@style/Widget.NetTap.Section</item>
+        <item name="bottomNavigationStyle">@style/Widget.NetTap.BottomNav</item>
     </style>
 </resources>

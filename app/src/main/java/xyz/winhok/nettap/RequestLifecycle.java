@@ -41,12 +41,12 @@ import java.util.function.Supplier;
 public final class RequestLifecycle<K, S> {
     private final Supplier<S> stateFactory;
     private final Map<K, S> states =
-            Collections.synchronizedMap(new WeakHashMap<K, S>());
+            Collections.synchronizedMap(new WeakHashMap<>());
     // Logically a Set of finished keys; Boolean.TRUE values are presence sentinels.
     // Backed by Map<K, Boolean> with WeakHashMap keys to mirror the lifecycle of
     // the primary `states` map without independently leaking K references.
     private final Map<K, Boolean> finishedFlags =
-            Collections.synchronizedMap(new WeakHashMap<K, Boolean>());
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     public RequestLifecycle(Supplier<S> stateFactory) {
         if (stateFactory == null) {

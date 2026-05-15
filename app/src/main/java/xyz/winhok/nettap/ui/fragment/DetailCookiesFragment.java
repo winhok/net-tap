@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import xyz.winhok.nettap.R;
+import xyz.winhok.nettap.ui.Dimens;
 import xyz.winhok.nettap.ui.NetTapUiState;
 import xyz.winhok.nettap.ui.adapter.CookieListAdapter;
 import xyz.winhok.nettap.ui.data.CookieParser;
@@ -27,6 +28,7 @@ public final class DetailCookiesFragment extends Fragment {
         if (event == null) {
             TextView text = new TextView(requireContext());
             text.setText(R.string.empty_cookies_selected);
+            Dimens.setPaddingDp(text, 12, 8);
             return text;
         }
         CookieListAdapter adapter = new CookieListAdapter();
@@ -34,10 +36,12 @@ public final class DetailCookiesFragment extends Fragment {
         if (adapter.getItemCount() == 0) {
             TextView empty = new TextView(requireContext());
             empty.setText(R.string.empty_cookies);
+            Dimens.setPaddingDp(empty, 12, 8);
             return empty;
         }
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
+        Dimens.setPaddingDp(root, 12, 12);
         SpacedRecyclerView list = new SpacedRecyclerView(requireContext());
         list.setLayoutManager(new LinearLayoutManager(requireContext()));
         list.setAdapter(adapter);
